@@ -1,0 +1,19 @@
+[
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "transform": {
+          "scheme": "https",
+          "host": "npmx.dev"
+        }
+      }
+    },
+    "condition": {
+      "regexFilter": "^https?://(www\\.)?npmjs\\.com/~[^/?#]+",
+      "resourceTypes": ["main_frame"]
+    }
+  }
+]

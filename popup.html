@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>npmx redirect</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon-48.png" alt="" />
+      <div>
+        <strong>npmx redirect</strong>
+        <span>npmjs.com -> npmx.dev</span>
+      </div>
+    </header>
+    <main>
+      <label class="master">
+        <span><strong>Redirects</strong><small>Master switch</small></span>
+        <input type="checkbox" name="enabled" />
+      </label>
+      <fieldset>
+        <legend>Routes</legend>
+        <label
+          ><span>Packages<small>/package/*</small></span
+          ><input type="checkbox" name="packages"
+        /></label>
+        <label
+          ><span>Search<small>/search</small></span
+          ><input type="checkbox" name="search"
+        /></label>
+        <label
+          ><span>Users<small>/~username</small></span
+          ><input type="checkbox" name="users"
+        /></label>
+        <label
+          ><span>Organizations<small>/org/*</small></span
+          ><input type="checkbox" name="organizations"
+        /></label>
+      </fieldset>
+    </main>
+    <footer>Type <kbd>npmx</kbd> + <kbd>Tab</kbd> in address bar.</footer>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "npmjs to npmx",
+  "description": "Redirect npmjs.com page visits to npmx.dev.",
+  "version": "1.0.0",
+  "permissions": ["declarativeNetRequestWithHostAccess", "storage", "webNavigation"],
+  "host_permissions": ["*://npmjs.com/*", "*://www.npmjs.com/*"],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "packages",
+        "enabled": true,
+        "path": "rules/packages.json"
+      },
+      {
+        "id": "search",
+        "enabled": true,
+        "path": "rules/search.json"
+      },
+      {
+        "id": "users",
+        "enabled": true,
+        "path": "rules/users.json"
+      },
+      {
+        "id": "organizations",
+        "enabled": true,
+        "path": "rules/organizations.json"
+      }
+    ]
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://npmjs.com/*", "*://www.npmjs.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "omnibox": {
+    "keyword": "npmx"
+  }
+}
