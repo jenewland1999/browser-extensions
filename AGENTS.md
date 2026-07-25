@@ -4,6 +4,8 @@
 
 - Use pnpm. Do not use npm or Yarn.
 - Keep dependencies pinned to exact versions.
+- Use pnpm workspaces and Turborepo for extension packages and tasks.
+- Keep each extension under `extensions/<extension-name>`.
 - Avoid runtime dependencies unless extension cannot reasonably work without
   them.
 
@@ -24,8 +26,9 @@
 
 ## Extension Security
 
-- Keep host permissions limited to exact required npmjs.com hosts.
+- Keep host permissions limited to exact hosts required by each extension.
 - Do not add remote code, telemetry, analytics, or network fetches.
-- Keep installed extension code readable and unminified.
+- Write extension runtime code in strict TypeScript and compile it to readable,
+  unminified JavaScript.
 - Load extension unpacked for personal use; do not add store publication or
   enterprise deployment workflows.

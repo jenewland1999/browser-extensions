@@ -36,7 +36,7 @@ jobs:
 
       - name: Verify archive contents
         run: |
-          test "$(unzip -Z1 dist/npmjs-to-npmx.zip | sort)" = "$(printf '%s\n' \
+          test "$(unzip -Z1 extensions/npmjs-to-npmx/dist/npmjs-to-npmx.zip | sort)" = "$(printf '%s\n' \
             background.js content.js icons/icon-128.png icons/icon-16.png \
             icons/icon-32.png icons/icon-48.png manifest.json popup.css popup.html \
             popup.js redirect.js rules/organizations.json rules/packages.json \

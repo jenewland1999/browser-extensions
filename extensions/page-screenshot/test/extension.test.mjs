@@ -1,0 +1,82 @@
+import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
+import test from "node:test";
+
+import { createCaptureTiles, createFilename, normalizeSettings } from "../dist/capture.js";
+
+const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
+
+test("build emits loadable extension files", async () => {
+  const outputFiles = await readdir("dist", { recursive: true });
+  assert.ok(outputFiles.includes("popup.js"));
+  assert.ok(outputFiles.includes("manifest.json"));
+  assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
+});
+
+test("uses only screenshot permissions", () => {
+  assert.equal(manifest.manifest_version, 3);
+  assert.deepEqual(manifest.permissions, ["activeTab", "downloads", "scripting", "storage"]);
+  assert.equal(manifest.host_permissions, undefined);
+  assert.equal(manifest.background.service_worker, "background.js");
+});
+
+test("creates full-page tiles including partial edges", () => {
+  const tiles = createCaptureTiles({
+    width: 1000,
+    height: 1500,
+    viewportWidth: 1000,
+    viewportHeight: 700,
+    scrollX: 0,
+    scrollY: 0,
+  });
+  assert.deepEqual(
+    tiles.map(({ y, height, scrollY, sourceY }) => ({ y, height, scrollY, sourceY })),
+    [
+      { y: 0, height: 700, scrollY: 0, sourceY: 0 },
+      { y: 700, height: 700, scrollY: 700, sourceY: 0 },
+      { y: 1400, height: 100, scrollY: 800, sourceY: 600 },
+    ],
+  );
+});
+
+test("creates timestamped screenshot path", () => {
+  assert.equal(
+    createFilename(new Date(2026, 6, 25, 9, 8, 7), "png", "www.elanco.com", "viewport"),
+    "elanco.com_viewport_2026-07-25_09-08-07.png",
+  );
+  assert.equal(
+    createFilename(new Date(2026, 6, 25, 9, 8, 7), "jpeg", "docs.example.com", "full-page"),
+    "docs.example.com_full-page_2026-07-25_09-08-07.jpg",
+  );
+  assert.equal(createFilename(new Date(2026, 6, 25, 9, 8, 7), "webp").endsWith(".webp"), true);
+  assert.equal(
+    createFilename(
+      new Date(2026, 6, 25, 9, 8, 7),
+      "png",
+      "www.elanco.com",
+      "full-page",
+      "%date%--%domain%--%type%",
+    ),
+    "2026-07-25--elanco.com--full-page.png",
+  );
+});
+
+test("normalizes screenshot settings", () => {
+  assert.deepEqual(normalizeSettings({ format: "jpeg", quality: 120, askWhereToSave: true }), {
+    format: "jpeg",
+    quality: 100,
+    askWhereToSave: true,
+    filenameTemplate: "%domain%_%type%_%date%_%time%",
+  });
+  assert.deepEqual(normalizeSettings({ quality: 0 }), {
+    format: "png",
+    quality: 1,
+    askWhereToSave: false,
+    filenameTemplate: "%domain%_%type%_%date%_%time%",
+  });
+});
+
+test("declares shortcuts for both capture types", () => {
+  assert.equal(manifest.commands["capture-viewport"].suggested_key.mac, "Command+Shift+1");
+  assert.equal(manifest.commands["capture-full-page"].suggested_key.mac, "Command+Shift+2");
+});

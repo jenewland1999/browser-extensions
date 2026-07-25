@@ -1,11 +1,13 @@
-const ROUTES = [
+import type { RulesetId, Settings } from "./settings.js";
+
+const ROUTES: ReadonlyArray<readonly [RulesetId, RegExp]> = [
   ["packages", /^\/package\//],
   ["search", /^\/search$/],
   ["users", /^\/~[^/]+/],
   ["organizations", /^\/org\//],
 ];
 
-export function getRedirectUrl(value, settings) {
+export function getRedirectUrl(value: string, settings: Readonly<Settings>): string | null {
   const url = new URL(value);
 
   if (
@@ -22,19 +24,20 @@ export function getRedirectUrl(value, settings) {
   return url.href;
 }
 
-export function getOmniboxUrl(value) {
+export function getOmniboxUrl(value: string): string {
   const query = value.trim();
   if (!query) return "https://npmx.dev/";
 
   const search = query.match(/^(?:(?:s|search)\s+|\?\s*)(.+)$/i);
-  if (search) {
-    return `https://npmx.dev/search?q=${encodeURIComponent(search[1].trim())}`;
+  const searchQuery = search?.[1];
+  if (searchQuery) {
+    return `https://npmx.dev/search?q=${encodeURIComponent(searchQuery.trim())}`;
   }
 
   return `https://npmx.dev/package/${encodeURI(query)}`;
 }
 
-export function escapeOmniboxText(value) {
+export function escapeOmniboxText(value: string): string {
   return value.replace(
     /[&<>"']/g,
     (character) =>
@@ -44,6 +47,6 @@ export function escapeOmniboxText(value) {
         ">": "&gt;",
         '"': "&quot;",
         "'": "&#39;",
-      })[character],
+      })[character] ?? character,
   );
 }

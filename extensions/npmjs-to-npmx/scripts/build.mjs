@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 const outputDirectory = resolve("dist");
-const archive = resolve(outputDirectory, "npmjs-to-npmx.zip");
-const files = [
+const staticPaths = ["manifest.json", "popup.html", "popup.css", "rules", "icons"];
+const archiveFiles = [
   "manifest.json",
   "background.js",
   "content.js",
@@ -23,8 +23,15 @@ const files = [
   "icons/icon-128.png",
 ];
 
+rmSync(outputDirectory, { recursive: true, force: true });
 mkdirSync(outputDirectory, { recursive: true });
-rmSync(archive, { force: true });
-execFileSync("zip", ["-X", archive, ...files], {
+execFileSync("pnpm", ["exec", "tsc"], { stdio: "inherit" });
+
+for (const path of staticPaths) {
+  cpSync(path, resolve(outputDirectory, path), { recursive: true });
+}
+
+execFileSync("zip", ["-X", "npmjs-to-npmx.zip", ...archiveFiles], {
+  cwd: outputDirectory,
   stdio: "inherit",
 });

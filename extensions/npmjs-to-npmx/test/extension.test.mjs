@@ -1,15 +1,22 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { escapeOmniboxText, getOmniboxUrl, getRedirectUrl } from "../redirect.js";
-import { DEFAULT_SETTINGS, normalizeSettings, RULESET_IDS } from "../settings.js";
+import { escapeOmniboxText, getOmniboxUrl, getRedirectUrl } from "../dist/redirect.js";
+import { DEFAULT_SETTINGS, normalizeSettings, RULESET_IDS } from "../dist/settings.js";
 
-const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
+const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 const ruleResources = manifest.declarative_net_request.rule_resources;
 const rules = await Promise.all(
-  ruleResources.map(async ({ path }) => JSON.parse(await readFile(path, "utf8"))),
+  ruleResources.map(async ({ path }) => JSON.parse(await readFile(`dist/${path}`, "utf8"))),
 );
+
+test("build emits loadable JavaScript without TypeScript source", async () => {
+  const outputFiles = await readdir("dist", { recursive: true });
+  assert.ok(outputFiles.includes("background.js"));
+  assert.ok(outputFiles.includes("manifest.json"));
+  assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
+});
 
 test("uses exact hosts and only required Manifest V3 permissions", () => {
   assert.equal(manifest.manifest_version, 3);

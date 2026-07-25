@@ -31,9 +31,10 @@ Run:
 
 ```sh
 pnpm validate
-unzip -l dist/npmjs-to-npmx.zip
-shasum -a 256 dist/npmjs-to-npmx.zip
+unzip -l extensions/npmjs-to-npmx/dist/npmjs-to-npmx.zip
+shasum -a 256 extensions/npmjs-to-npmx/dist/npmjs-to-npmx.zip
 ```
 
-Archive must match runtime file allowlist in `scripts/package.mjs`. Any extra
-file is a release blocker until explained and reviewed.
+Archive must match runtime file allowlist in
+`extensions/npmjs-to-npmx/scripts/build.mjs`. Any extra file is a release
+blocker until explained and reviewed.

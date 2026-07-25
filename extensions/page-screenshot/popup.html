@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page Screenshot</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Page<br />Screenshot</strong>
+      <span>Clean captures, exactly where you need them.</span>
+    </header>
+    <main>
+      <button type="button" data-capture="viewport">
+        <span class="icon viewport" aria-hidden="true"></span>
+        <span><strong>Viewport</strong><small>Capture visible area</small></span>
+        <kbd id="shortcut-viewport"></kbd>
+      </button>
+      <button type="button" data-capture="full-page">
+        <span class="icon full-page" aria-hidden="true"></span>
+        <span><strong>Full page</strong><small>Capture from top to bottom</small></span>
+        <kbd id="shortcut-full-page"></kbd>
+      </button>
+      <section class="settings" aria-labelledby="settings-title">
+        <h2 id="settings-title">Save settings</h2>
+        <label class="field" for="format">
+          <span>File type</span>
+          <select id="format">
+            <option value="png">PNG · lossless</option>
+            <option value="jpeg">JPEG · compact</option>
+            <option value="webp">WebP · smallest</option>
+          </select>
+        </label>
+        <label class="field" for="filename-template">
+          <span>Filename</span>
+          <input id="filename-template" type="text" spellcheck="false" />
+          <small
+            ><code>%domain%</code> <code>%type%</code> <code>%date%</code>
+            <code>%time%</code></small
+          >
+        </label>
+        <label id="quality-field" class="quality" for="quality">
+          <span><strong>Quality</strong><output id="quality-value" for="quality">90%</output></span>
+          <input id="quality" type="range" min="1" max="100" value="90" />
+          <small id="quality-note"></small>
+        </label>
+        <label class="toggle" for="ask-where">
+          <span><strong>Choose each time</strong><small>Otherwise save to Downloads</small></span>
+          <input id="ask-where" type="checkbox" />
+        </label>
+        <button id="configure-shortcuts" class="text-button" type="button">
+          Configure keyboard shortcuts
+        </button>
+      </section>
+      <p id="status" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

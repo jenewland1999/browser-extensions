@@ -1,20 +1,21 @@
 {
-  "name": "npmjs-to-npmx-extension",
-  "version": "1.0.0",
+  "name": "browser-extensions",
   "private": true,
-  "description": "Private npmjs to npmx Chromium extension.",
+  "description": "Private browser extension monorepo.",
   "type": "module",
   "scripts": {
-    "build": "node scripts/package.mjs",
+    "build": "turbo run build",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "lint": "oxlint .",
-    "test": "node --test",
-    "validate": "pnpm format && pnpm lint && pnpm build && pnpm test"
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "validate": "pnpm format && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },
   "devDependencies": {
     "oxfmt": "0.60.0",
-    "oxlint": "1.75.0"
+    "oxlint": "1.75.0",
+    "turbo": "2.10.6"
   },
   "engines": {
     "node": ">=24"
