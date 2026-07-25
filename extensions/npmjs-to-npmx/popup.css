@@ -1,41 +1,58 @@
 :root {
   color-scheme: dark;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  background: #090909;
-  color: #f7f7f5;
+  font:
+    13px/1.45 "Avenir Next",
+    Avenir,
+    "Century Gothic",
+    sans-serif;
+  color: #f4f3ed;
+  background: #0c0d0f;
+  --accent: #51c8fc;
+  --line: #30343a;
+  --muted: #9399a2;
 }
 
 * {
   box-sizing: border-box;
 }
 body {
+  width: 360px;
   margin: 0;
-  width: 320px;
+  background: linear-gradient(115deg, transparent 68%, rgb(81 200 252 / 5%) 68%), #0c0d0f;
 }
 header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #292929;
+  position: relative;
+  min-height: 122px;
+  padding: 24px 22px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
 }
-header img {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+.header-art {
+  position: absolute;
+  top: 20px;
+  right: 15px;
+  width: 104px;
+  height: 104px;
 }
-header div,
+header strong {
+  font-size: 27px;
+  line-height: 0.92;
+  letter-spacing: -0.055em;
+}
+header span {
+  display: block;
+  width: 185px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
 label span {
   display: grid;
   gap: 3px;
 }
-header strong {
-  font-size: 15px;
-}
-header span,
 small,
 footer {
-  color: #9a9a96;
+  color: var(--muted);
   font-size: 11px;
 }
 main {
@@ -50,7 +67,7 @@ label {
   cursor: pointer;
 }
 .master {
-  border-bottom: 1px solid #292929;
+  border-bottom: 1px solid var(--line);
   margin-bottom: 8px;
 }
 fieldset {
@@ -63,7 +80,7 @@ fieldset:disabled {
 }
 legend {
   padding: 8px 0 2px;
-  color: #51c8fc;
+  color: var(--accent);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -89,12 +106,12 @@ input::after {
   transition: 0.15s ease;
 }
 input:checked {
-  border-color: #51c8fc;
+  border-color: var(--accent);
   background: #0d3343;
 }
 input:checked::after {
   transform: translateX(16px);
-  background: #51c8fc;
+  background: var(--accent);
 }
 input:focus-visible {
   outline: 2px solid #fff;
@@ -102,7 +119,7 @@ input:focus-visible {
 }
 footer {
   padding: 12px 16px 14px;
-  border-top: 1px solid #292929;
+  border-top: 1px solid var(--line);
 }
 kbd {
   border: 1px solid #3c3c3c;

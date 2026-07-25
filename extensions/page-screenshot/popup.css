@@ -38,17 +38,25 @@ header {
 
 header::after {
   position: absolute;
-  top: -34px;
-  right: -25px;
+  top: -12px;
+  right: 4px;
   width: 128px;
-  height: 154px;
-  border: 18px solid var(--accent);
+  height: 128px;
+  background:
+    linear-gradient(var(--accent) 0 0) top left / 48px 18px no-repeat,
+    linear-gradient(var(--accent) 0 0) top left / 18px 48px no-repeat,
+    linear-gradient(var(--accent) 0 0) top right / 48px 18px no-repeat,
+    linear-gradient(var(--accent) 0 0) top right / 18px 48px no-repeat,
+    linear-gradient(var(--accent) 0 0) bottom left / 48px 18px no-repeat,
+    linear-gradient(var(--accent) 0 0) bottom left / 18px 48px no-repeat,
+    linear-gradient(var(--accent) 0 0) bottom right / 48px 18px no-repeat,
+    linear-gradient(var(--accent) 0 0) bottom right / 18px 48px no-repeat;
   content: "";
   transform: rotate(18deg);
 }
 
 header strong {
-  font-size: 25px;
+  font-size: 27px;
   line-height: 0.92;
   letter-spacing: -0.055em;
 }
@@ -58,7 +66,7 @@ header span {
   width: 185px;
   margin-top: 10px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 main {

@@ -36,6 +36,15 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  extensions/reading-list-exporter:
+    devDependencies:
+      '@types/chrome':
+        specifier: 0.2.2
+        version: 0.2.2
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
 packages:
 
   '@oxfmt/binding-android-arm-eabi@0.60.0':

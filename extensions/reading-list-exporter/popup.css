@@ -1,0 +1,238 @@
+:root {
+  color-scheme: dark;
+  font:
+    13px/1.45 "Avenir Next",
+    Avenir,
+    "Century Gothic",
+    sans-serif;
+  color: #f4f3ed;
+  background: #0c0d0f;
+  --panel: #15171a;
+  --line: #30343a;
+  --muted: #9399a2;
+  --accent: #c084fc;
+  --danger: #ff7272;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  background: linear-gradient(115deg, transparent 72%, rgb(192 132 252 / 5%) 72%), #0c0d0f;
+}
+
+header {
+  position: relative;
+  min-height: 122px;
+  padding: 24px 22px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+.header-art {
+  position: absolute;
+  top: 18px;
+  right: -8px;
+  display: grid;
+  gap: 13px;
+  width: 126px;
+  padding: 12px 0;
+  transform: rotate(-8deg);
+}
+
+.header-art b {
+  display: block;
+  height: 15px;
+  background: var(--accent);
+}
+
+.header-art b:nth-child(1) {
+  width: 108px;
+  margin-left: 18px;
+}
+
+.header-art b:nth-child(2) {
+  width: 78px;
+}
+
+.header-art b:nth-child(3) {
+  width: 96px;
+  margin-left: 30px;
+}
+
+header strong {
+  font-size: 27px;
+  line-height: 0.92;
+  letter-spacing: -0.055em;
+}
+
+header span {
+  display: block;
+  width: 185px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+button > span:last-child {
+  display: grid;
+}
+
+small,
+#status {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+main {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 1px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.total strong {
+  color: var(--accent);
+  font:
+    21px ui-monospace,
+    "SFMono-Regular",
+    Menlo,
+    monospace;
+}
+
+.section-label {
+  margin: 4px 1px 0;
+  color: var(--accent);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+button {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 13px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+button:not(:disabled):hover {
+  background: #1b1e22;
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+
+button:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+button strong {
+  font-size: 12px;
+}
+
+.danger:not(:disabled):hover {
+  border-color: var(--danger);
+}
+
+.danger strong {
+  color: var(--danger);
+}
+
+.icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #b8bbc2;
+}
+
+.icon::before,
+.icon::after {
+  position: absolute;
+  content: "";
+}
+
+.import-icon::before,
+.export-icon::before {
+  left: 12px;
+  width: 3px;
+  height: 13px;
+  background: var(--accent);
+}
+
+.import-icon::before {
+  top: 5px;
+}
+
+.export-icon::before {
+  top: 9px;
+}
+
+.import-icon::after,
+.export-icon::after {
+  left: 9px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  transform: rotate(45deg);
+}
+
+.import-icon::after {
+  bottom: 6px;
+}
+
+.export-icon::after {
+  top: 5px;
+  transform: rotate(225deg);
+}
+
+.clear-icon::before {
+  inset: 7px 8px 5px;
+  border: 2px solid var(--danger);
+  border-top: 0;
+}
+
+.clear-icon::after {
+  top: 4px;
+  left: 7px;
+  width: 14px;
+  border-top: 2px solid var(--danger);
+  box-shadow: 4px -3px 0 -1px var(--danger);
+}
+
+#status {
+  min-height: 18px;
+  margin: 3px 1px 0;
+}
+
+#status.error {
+  color: var(--danger);
+}
