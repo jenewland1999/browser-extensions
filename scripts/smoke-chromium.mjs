@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -14,6 +15,15 @@ const executableCandidates = [
   "chromium",
   "chromium-browser",
 ].filter(Boolean);
+
+function extensionId(path) {
+  return [...createHash("sha256").update(path).digest().subarray(0, 16)]
+    .flatMap((byte) => [
+      String.fromCharCode(97 + (byte >> 4)),
+      String.fromCharCode(97 + (byte & 15)),
+    ])
+    .join("");
+}
 
 function wait(milliseconds) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
@@ -74,35 +84,6 @@ async function evaluate(webSocketUrl, expression) {
   }
 }
 
-async function discoverExtensionIds(profileDirectory, extensions, processHandle) {
-  const preferencePaths = [
-    join(profileDirectory, "Default", "Preferences"),
-    join(profileDirectory, "Default", "Secure Preferences"),
-  ];
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (processHandle.exitCode !== null) {
-      throw new Error(`Chromium exited with code ${processHandle.exitCode}.`);
-    }
-    for (const preferencePath of preferencePaths) {
-      let settings;
-      try {
-        settings = JSON.parse(readFileSync(preferencePath, "utf8")).extensions?.settings;
-      } catch (error) {
-        if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error;
-        continue;
-      }
-      for (const [id, extensionSettings] of Object.entries(settings ?? {})) {
-        if (typeof extensionSettings?.path !== "string") continue;
-        const extension = extensions.find(({ path }) => path === resolve(extensionSettings.path));
-        if (extension) extension.id = id;
-      }
-    }
-    if (extensions.every(({ id }) => id)) return;
-    await wait(100);
-  }
-  throw new Error("Timed out discovering unpacked extension IDs from Chromium's profile.");
-}
-
 async function findExecutable() {
   for (const candidate of executableCandidates) {
     if (candidate.includes("/")) {
@@ -130,7 +111,7 @@ const executable = await findExecutable();
 const profileDirectory = mkdtempSync(join(tmpdir(), "extension-smoke-"));
 const extensions = archives.map(({ extension, page, background = false }) => {
   const path = resolve("extensions", extension, "dist");
-  return { extension, page, background, path, id: undefined };
+  return { extension, page, background, path, id: extensionId(path) };
 });
 const extensionPaths = extensions.map(({ path }) => path).join(",");
 const arguments_ = [
@@ -156,7 +137,6 @@ try {
     .trim()
     .split("\n");
   const origin = `http://127.0.0.1:${port}`;
-  await discoverExtensionIds(profileDirectory, extensions, browser);
 
   for (const extension of extensions) {
     const url = `chrome-extension://${extension.id}/${extension.page}`;
