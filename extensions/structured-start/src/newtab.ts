@@ -9,8 +9,11 @@ import {
   findNode,
   findParentSection,
   inferNameFromUrl,
+  MAX_BACKGROUND_DATA_URL_LENGTH,
   MAX_DEPTH,
+  MAX_ICON_DATA_URL_LENGTH,
   nodeDepth,
+  normalizeImageDataUrl,
   parseImport,
   removeNode,
   subtreeDepth,
@@ -27,9 +30,14 @@ import {
   type StartPageData,
   type Theme,
 } from "./model.js";
+import { assertStorageFits, PersistenceCoordinator, type Revisioned } from "./persistence.js";
 
 const STORAGE_KEY = "structuredStartData";
+const STORAGE_LOCK = "structuredStartData-write";
 const ONBOARDING_KEY = "structuredStartOnboardingComplete";
+let initialized = false;
+let hasDeferredInitialChange = false;
+let deferredInitialValue: unknown;
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -94,6 +102,12 @@ const selectedIds = new Set<string>();
 let faviconRevision = 0;
 let importType: "items" | "settings" = "items";
 
+interface StoredData {
+  storageVersion: 1;
+  revision: number;
+  data: StartPageData;
+}
+
 interface EmojiGroup {
   name: string;
   emojis: [emoji: string, name: string, tone: 0 | 1][];
@@ -143,6 +157,13 @@ function setIcons(root: ParentNode = document): void {
     element.insertAdjacentHTML("afterbegin", icon(name));
   }
 }
+
+document.addEventListener("pointerdown", (event) => {
+  const target = event.target as Element;
+  if (target.closest(".select-control, .select-list")) return;
+  for (const select of document.querySelectorAll<HTMLSelectElement>("select[data-enhanced='true']"))
+    select.dispatchEvent(new Event("select-close"));
+});
 
 function placeListbox(
   trigger: HTMLElement,
@@ -274,8 +295,14 @@ function enhanceSelects(root: ParentNode = document): void {
     };
     button.addEventListener("click", () => {
       const opening = list.hidden;
-      if (opening) openList();
-      else close();
+      if (opening) {
+        for (const other of document.querySelectorAll<HTMLSelectElement>(
+          "select[data-enhanced='true']",
+        )) {
+          if (other !== select) other.dispatchEvent(new Event("select-close"));
+        }
+        openList();
+      } else close();
     });
     const handleKeydown = (event: KeyboardEvent): void => {
       if (!["ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
@@ -304,12 +331,9 @@ function enhanceSelects(root: ParentNode = document): void {
     };
     control.addEventListener("keydown", handleKeydown);
     list.addEventListener("keydown", handleKeydown);
-    document.addEventListener("pointerdown", (event) => {
-      const target = event.target as Element;
-      if (!list.hidden && !control.contains(target) && !list.contains(target)) close();
-    });
     select.addEventListener("change", sync);
     select.addEventListener("select-sync", sync);
+    select.addEventListener("select-close", close);
     select.insertAdjacentElement("afterend", control);
     control.append(button, list);
     sync();
@@ -330,8 +354,57 @@ function completeOnboarding(): void {
   void chrome.storage.local.set({ [ONBOARDING_KEY]: true });
 }
 
+function storedData(value: unknown): Revisioned<StartPageData> {
+  if (
+    value &&
+    typeof value === "object" &&
+    (value as Partial<StoredData>).storageVersion === 1 &&
+    Number.isSafeInteger((value as Partial<StoredData>).revision) &&
+    (value as Partial<StoredData>).data
+  ) {
+    return {
+      revision: (value as StoredData).revision,
+      data: parseImport((value as StoredData).data),
+    };
+  }
+  return { revision: 0, data: parseImport(value) };
+}
+
+function applyStoredData(next: { revision: number; data: StartPageData }): void {
+  data = next.data;
+  if (selectedId && !findNode(data.sections, selectedId)) selectedId = undefined;
+  applyAppearance();
+  render();
+}
+
+const persistence = new PersistenceCoordinator<StartPageData>({
+  revision: 0,
+  read: async () => {
+    const value = (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+    return value === undefined
+      ? { revision: 0, data: structuredClone(DEFAULT_DATA) }
+      : storedData(value);
+  },
+  write: async (next) => {
+    const stored: StoredData = { storageVersion: 1, ...next };
+    const allValues = await chrome.storage.local.get(null);
+    assertStorageFits({ ...allValues, [STORAGE_KEY]: stored });
+    await chrome.storage.local.set({ [STORAGE_KEY]: stored });
+  },
+  clear: async () => chrome.storage.local.clear(),
+  withLock: async (callback) => navigator.locks.request(STORAGE_LOCK, callback),
+  applyExternal: (next) => {
+    applyStoredData(next);
+    showToast("Layout updated from another tab.");
+  },
+  reportConflict: () =>
+    showToast("This layout changed in another tab. Refreshed without overwriting it.", true),
+  reportError: (error) =>
+    showToast(error instanceof Error ? error.message : "Could not save this change.", true),
+});
+
 async function save(): Promise<void> {
-  await chrome.storage.local.set({ [STORAGE_KEY]: data });
+  await persistence.save(structuredClone(data));
 }
 
 function applyAppearance(): void {
@@ -520,22 +593,34 @@ function renderNode(node: Node, depth: number): HTMLElement {
   header.className = "section-header";
   const state = selectionState(node);
   header.innerHTML = `
-    <input class="selection-checkbox" type="checkbox" aria-label="Select ${escapeHtml(node.name)}"${state.checked ? " checked" : ""} />
-    <button class="collapse-button" type="button" aria-label="${node.collapsed ? "Expand" : "Collapse"} ${escapeHtml(node.name)}">${icon(node.collapsed ? "chevron-right" : "chevron-down", 15)}</button>
-    <h2>${escapeHtml(node.name)}</h2>
+    <input class="selection-checkbox" type="checkbox" />
+    <button class="collapse-button" type="button">${icon(node.collapsed ? "chevron-right" : "chevron-down", 15)}</button>
+    <h2></h2>
     <div class="section-actions">
-      <button class="node-action" type="button" data-action="edit" aria-label="Edit ${escapeHtml(node.name)}">${icon("settings", 15)}</button>
-      <button class="drag-handle" type="button" aria-label="Drag ${escapeHtml(node.name)}">${icon("grip", 15)}</button>
+      <button class="node-action" type="button" data-action="edit">${icon("settings", 15)}</button>
+      <button class="drag-handle" type="button">${icon("grip", 15)}</button>
     </div>
     ${data.showItemCounts ? `<span class="section-count">${node.children.length}</span>` : ""}`;
   const sectionCheckbox = header.querySelector<HTMLInputElement>(".selection-checkbox");
   if (sectionCheckbox) {
+    sectionCheckbox.checked = state.checked;
+    sectionCheckbox.setAttribute("aria-label", `Select ${node.name}`);
     sectionCheckbox.indeterminate = state.indeterminate;
     sectionCheckbox.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleSelected(node.id);
     });
   }
+  header
+    .querySelector<HTMLButtonElement>(".collapse-button")
+    ?.setAttribute("aria-label", `${node.collapsed ? "Expand" : "Collapse"} ${node.name}`);
+  header.querySelector("h2")?.replaceChildren(node.name);
+  header
+    .querySelector<HTMLButtonElement>("[data-action='edit']")
+    ?.setAttribute("aria-label", `Edit ${node.name}`);
+  header
+    .querySelector<HTMLButtonElement>(".drag-handle")
+    ?.setAttribute("aria-label", `Drag ${node.name}`);
   header.querySelector<HTMLButtonElement>(".collapse-button")?.addEventListener("click", () => {
     setSectionCollapsed(node, !node.collapsed);
     void persistAndRender();
@@ -596,9 +681,15 @@ function renderLink(node: LinkNode): HTMLElement {
   link.className = "link-tile";
   link.type = "button";
   link.title = node.name;
-  link.innerHTML = `
-    <span class="tile-icon${node.icon === "" && faviconBackgroundEnabled(node) ? " favicon-backed" : ""}" style="${faviconStyle(node)}">${renderNodeIcon(node)}</span>
-    <span class="tile-name">${escapeHtml(node.name)}</span>`;
+  const tileIcon = document.createElement("span");
+  tileIcon.className = `tile-icon${node.icon === "" && faviconBackgroundEnabled(node) ? " favicon-backed" : ""}`;
+  tileIcon.style.setProperty("--favicon-padding", `${node.faviconPadding}px`);
+  tileIcon.style.setProperty("--favicon-radius", `${node.faviconRadius}%`);
+  tileIcon.append(createNodeIcon(node));
+  const tileName = document.createElement("span");
+  tileName.className = "tile-name";
+  tileName.textContent = node.name;
+  link.append(tileIcon, tileName);
   const linkCheckbox = document.createElement("input");
   linkCheckbox.className = "selection-checkbox link-checkbox";
   linkCheckbox.type = "checkbox";
@@ -616,8 +707,14 @@ function renderLink(node: LinkNode): HTMLElement {
   const actions = document.createElement("div");
   actions.className = "tile-actions";
   actions.innerHTML = data.locked
-    ? `<button class="node-action" type="button" aria-label="Edit ${escapeHtml(node.name)}">${icon("settings", 14)}</button>`
-    : `<button class="node-action" type="button" aria-label="Open ${escapeHtml(node.name)}">${icon("external-link", 14)}</button><button class="drag-handle" type="button" aria-label="Drag ${escapeHtml(node.name)}">${icon("grip", 14)}</button>`;
+    ? `<button class="node-action" type="button">${icon("settings", 14)}</button>`
+    : `<button class="node-action" type="button">${icon("external-link", 14)}</button><button class="drag-handle" type="button">${icon("grip", 14)}</button>`;
+  actions
+    .querySelector<HTMLButtonElement>(".node-action")
+    ?.setAttribute("aria-label", `${data.locked ? "Edit" : "Open"} ${node.name}`);
+  actions
+    .querySelector<HTMLButtonElement>(".drag-handle")
+    ?.setAttribute("aria-label", `Drag ${node.name}`);
   actions.querySelector<HTMLButtonElement>(".node-action")?.addEventListener("click", () => {
     if (data.locked) openPanel(node.id);
     else openLink(node.url, node.openMode);
@@ -634,11 +731,20 @@ function escapeHtml(value: string): string {
   return span.innerHTML;
 }
 
-function renderNodeIcon(node: LinkNode): string {
-  if (node.icon.startsWith("data:image/")) return `<img src="${node.icon}" alt="" />`;
-  return node.icon
-    ? escapeHtml(node.icon)
-    : `<img class="favicon" src="${faviconUrl(node.url)}" alt="" />`;
+function createNodeIcon(node: LinkNode): globalThis.Node {
+  if (node.icon && !node.icon.startsWith("data:")) return document.createTextNode(node.icon);
+  const image = document.createElement("img");
+  image.alt = "";
+  if (node.icon) image.src = node.icon;
+  else {
+    image.className = "favicon";
+    image.src = faviconUrl(node.url);
+  }
+  return image;
+}
+
+function renderNodeIcon(_node: LinkNode): string {
+  return '<span class="icon-dom-mount"></span>';
 }
 
 function faviconStyle(node: LinkNode): string {
@@ -1103,11 +1209,17 @@ function moveNode(id: string, destination: DragDestination): void {
 }
 
 function inputField(label: string, value: string, name: string, type = "text"): string {
-  return `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${escapeHtml(value)}" /></label>`;
+  return `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${escapeAttribute(value)}" /></label>`;
+}
+
+function escapeAttribute(value: string): string {
+  return escapeHtml(value).replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
 function renderEditor(): void {
   const node = selectedId ? findNode(data.sections, selectedId) : undefined;
+  for (const select of editor.querySelectorAll<HTMLSelectElement>("select[data-enhanced='true']"))
+    select.dispatchEvent(new Event("select-close"));
   editor.replaceChildren();
   pageSettings.hidden = Boolean(node);
   panelTitle.textContent = node
@@ -1140,6 +1252,8 @@ function renderEditor(): void {
         <label class="field"><span>Open in</span><select name="openMode"><option value="current"${node.openMode === "current" ? " selected" : ""}>Current tab</option><option value="tab"${node.openMode === "tab" ? " selected" : ""}>New tab</option><option value="window"${node.openMode === "window" ? " selected" : ""}>New window</option></select></label>
         <fieldset class="icon-field"><div class="icon-heading"><legend>Icon</legend><span class="icon-preview${node.icon === "" && faviconBackgroundEnabled(node) ? " favicon-backed" : ""}" style="${faviconStyle(node)}">${renderNodeIcon(node)}</span></div><div class="icon-source-tabs" role="tablist" aria-label="Icon source"><button type="button" name="use-favicon" role="tab" aria-selected="${iconSource === "favicon"}">Favicon</button><button type="button" name="use-emoji" role="tab" aria-selected="${iconSource === "emoji"}">Emoji</button><button type="button" name="use-custom" role="tab" aria-selected="${iconSource === "custom"}">Icon</button></div><div class="icon-source-panel favicon-panel"${iconSource === "favicon" ? "" : " hidden"}><label class="field switch-field favicon-background-field"><span>Background (${darkScheme() ? "dark" : "light"} theme)</span><input name="faviconBackground" type="checkbox" role="switch"${faviconBackgroundEnabled(node) ? " checked" : ""} /><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></label><label class="field range-field"><span>Roundedness</span><input name="faviconRadius" type="range" min="0" max="50" value="${node.faviconRadius}" /><output>${node.faviconRadius}%</output></label><label class="field range-field"><span>Padding</span><input name="faviconPadding" type="range" min="0" max="8" value="${node.faviconPadding}" /><output>${node.faviconPadding}px</output></label></div><div class="emoji-picker"${iconSource === "emoji" ? "" : " hidden"}><div class="emoji-picker-toolbar"><input class="emoji-search" name="emoji-search" type="search" placeholder="Search all emojis" autocomplete="off" /><label class="tone-field"><span>Skin tone</span><select class="tone-select" aria-label="Default skin tone">${SKIN_TONES.map((tone) => `<option value="${tone}"${emojiSkinTone === tone ? " selected" : ""}>${applySkinTone("👋", tone)}</option>`).join("")}</select></label></div><div class="emoji-shelves"></div><div class="emoji-categories" role="tablist" aria-label="Emoji categories"></div><div class="emoji-grid" aria-live="polite"></div><p class="emoji-empty" hidden>No emojis found.</p></div><div class="icon-drop-zone" tabindex="0"${iconSource === "custom" ? "" : " hidden"}><strong>Drop, paste, or click</strong><span>PNG, JPEG, WebP, GIF, or SVG</span><input name="icon-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden /></div></fieldset></section>
         <section class="settings-group link-actions"><h2>Actions</h2><button class="secondary-button" name="duplicate" type="button">${icon("copy", 15)} Duplicate link</button><button class="danger-button" name="delete" type="button">${icon("trash", 15)} Delete link</button></section>`;
+  if (node.type === "link")
+    form.querySelector(".icon-preview")?.replaceChildren(createNodeIcon(node));
   form.addEventListener("input", (event) => {
     const target = event.target as Element;
     if (target.closest(".emoji-picker") || target.matches("input[name='url']")) return;
@@ -1273,7 +1387,7 @@ function bindLinkEditor(form: HTMLFormElement, node: LinkNode): void {
       showSource("favicon");
       const preview = form.querySelector<HTMLElement>(".icon-preview");
       preview?.replaceChildren();
-      preview?.insertAdjacentHTML("afterbegin", renderNodeIcon(node));
+      preview?.append(createNodeIcon(node));
       preview?.classList.toggle("favicon-backed", faviconBackgroundEnabled(node));
       void save();
       render(true);
@@ -1452,8 +1566,8 @@ async function setCustomIcon(node: LinkNode, file: File): Promise<void> {
     node.unmodifiedDuplicate = false;
     node.icon =
       file.type === "image/svg+xml"
-        ? sanitizeSvg(await file.text())
-        : await readImage(file, 750_000);
+        ? sanitizeSvg(await file.text(), MAX_ICON_DATA_URL_LENGTH)
+        : await readImage(file, MAX_ICON_DATA_URL_LENGTH);
     await persistAndRender();
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Icon upload failed.", true);
@@ -1464,8 +1578,8 @@ async function setBackgroundImage(file: File): Promise<void> {
   try {
     data.backgroundImage =
       file.type === "image/svg+xml"
-        ? sanitizeSvg(await file.text())
-        : await readImage(file, 6_000_000);
+        ? sanitizeSvg(await file.text(), MAX_BACKGROUND_DATA_URL_LENGTH)
+        : await readImage(file, MAX_BACKGROUND_DATA_URL_LENGTH);
     data.backgroundType = "image";
     applyAppearance();
     await save();
@@ -1474,13 +1588,13 @@ async function setBackgroundImage(file: File): Promise<void> {
   }
 }
 
-function sanitizeSvg(source: string): string {
+function sanitizeSvg(source: string, maxDataUrlLength = MAX_ICON_DATA_URL_LENGTH): string {
   if (source.length > 250_000) throw new Error("SVG must be smaller than 250 KB.");
   const document = new DOMParser().parseFromString(source, "image/svg+xml");
   const svg = document.documentElement;
   if (svg.localName !== "svg" || document.querySelector("parsererror"))
     throw new Error("Paste a valid SVG.");
-  for (const element of svg.querySelectorAll("script, foreignObject")) element.remove();
+  for (const element of svg.querySelectorAll("script, style, foreignObject")) element.remove();
   for (const element of svg.querySelectorAll("*")) {
     for (let index = element.attributes.length - 1; index >= 0; index -= 1) {
       const attribute = element.attributes[index];
@@ -1495,19 +1609,27 @@ function sanitizeSvg(source: string): string {
     }
   }
   const serialized = new XMLSerializer().serializeToString(svg);
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
+  const normalized = normalizeImageDataUrl(
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`,
+    maxDataUrlLength,
+  );
+  if (!normalized) throw new Error("SVG contains unsupported or unsafe content.");
+  return normalized;
 }
 
-async function readImage(file: File, maxBytes: number): Promise<string> {
-  if (!file.type.startsWith("image/")) throw new Error("Choose an image file.");
-  if (file.size > maxBytes)
-    throw new Error(`Image must be smaller than ${Math.round(maxBytes / 1000)} KB.`);
-  return await new Promise((resolve, reject) => {
+async function readImage(file: File, maxDataUrlLength: number): Promise<string> {
+  if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type))
+    throw new Error("Choose a PNG, JPG, GIF, WebP, or SVG image.");
+  if (file.size > maxDataUrlLength) throw new Error("Image is too large to store.");
+  const value = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => resolve(String(reader.result)));
     reader.addEventListener("error", () => reject(new Error("Could not read image.")));
     reader.readAsDataURL(file);
   });
+  const normalized = normalizeImageDataUrl(value, maxDataUrlLength);
+  if (!normalized) throw new Error("Image is invalid or too large to store.");
+  return normalized;
 }
 
 function positionFloatingElement(element: HTMLElement, position: { x: number; y: number }): void {
@@ -1787,7 +1909,7 @@ async function fixFaviconContrast(): Promise<void> {
 async function resetExtension(): Promise<void> {
   if (!window.confirm("Reset Tessera? This permanently deletes all groups, links, and settings."))
     return;
-  await chrome.storage.local.clear();
+  if (!(await persistence.reset())) return;
   data = structuredClone(DEFAULT_DATA);
   selectedId = undefined;
   lastSectionId = undefined;
@@ -2104,7 +2226,7 @@ backgroundDropZone.addEventListener("paste", (event) => {
   }
   const text = event.clipboardData?.getData("text/plain") ?? "";
   try {
-    data.backgroundImage = sanitizeSvg(text);
+    data.backgroundImage = sanitizeSvg(text, MAX_BACKGROUND_DATA_URL_LENGTH);
     data.backgroundType = "image";
     applyAppearance();
     void save();
@@ -2134,6 +2256,26 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   faviconRevision += 1;
   applyAppearance();
   render();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  const change = changes[STORAGE_KEY];
+  if (!change) return;
+  if (!initialized) {
+    hasDeferredInitialChange = true;
+    deferredInitialValue = change.newValue;
+    return;
+  }
+  try {
+    const next =
+      change.newValue === undefined
+        ? { revision: 0, data: structuredClone(DEFAULT_DATA) }
+        : storedData(change.newValue);
+    persistence.receiveExternal(next);
+  } catch {
+    showToast("Another tab saved an invalid layout. Kept this tab unchanged.", true);
+  }
 });
 
 async function initialize(): Promise<void> {
@@ -2176,7 +2318,9 @@ async function initialize(): Promise<void> {
     positionFloatingElement(toolbarMinimized ? toolbarOrb : toolbar, toolbarPosition);
   if (value !== undefined) {
     try {
-      data = parseImport(value);
+      const storedDataValue = storedData(value);
+      data = storedDataValue.data;
+      persistence.setRevision(storedDataValue.revision);
     } catch {
       data = structuredClone(DEFAULT_DATA);
       showToast("Stored layout was invalid. Started with blank canvas.", true);
@@ -2184,8 +2328,17 @@ async function initialize(): Promise<void> {
   }
   onboardingComplete = stored[ONBOARDING_KEY] === true;
   if (value !== undefined) completeOnboarding();
+  initialized = true;
+  if (hasDeferredInitialChange) {
+    const next =
+      deferredInitialValue === undefined
+        ? { revision: 0, data: structuredClone(DEFAULT_DATA) }
+        : storedData(deferredInitialValue);
+    persistence.receiveExternal(next);
+  }
   applyAppearance();
   render();
+  document.documentElement.dataset["extensionReady"] = "true";
 }
 
 void initialize();

@@ -1,7 +1,10 @@
 import {
   createBookmarksHtml,
   createExportFilename,
+  MAX_IMPORT_FILE_BYTES,
+  OPERATION_CONCURRENCY,
   parseBookmarksHtml,
+  settleWithConcurrency,
   type ReadingListItem,
 } from "./export.js";
 
@@ -18,6 +21,8 @@ const importButton = requireElement<HTMLButtonElement>("#import");
 const fileInput = requireElement<HTMLInputElement>("#import-file");
 const exportButton = requireElement<HTMLButtonElement>("#export");
 const deleteButton = requireElement<HTMLButtonElement>("#delete");
+let itemCount = 0;
+let busy = false;
 
 function showStatus(message: string, isError = false): void {
   status.textContent = message;
@@ -26,6 +31,7 @@ function showStatus(message: string, isError = false): void {
 
 async function loadItems(): Promise<ReadingListItem[]> {
   const items = await chrome.readingList.query({});
+  itemCount = items.length;
   const unreadCount = items.filter((item) => !item.hasBeenRead).length;
   count.textContent = String(items.length);
   summary.textContent = `${unreadCount} unread · ${items.length - unreadCount} read`;
@@ -34,10 +40,20 @@ async function loadItems(): Promise<ReadingListItem[]> {
   return items;
 }
 
-function setBusy(busy: boolean): void {
-  importButton.disabled = busy;
-  exportButton.disabled = busy;
-  deleteButton.disabled = busy;
+function setBusy(nextBusy: boolean): void {
+  busy = nextBusy;
+  importButton.disabled = nextBusy;
+  exportButton.disabled = nextBusy || itemCount === 0;
+  deleteButton.disabled = nextBusy || itemCount === 0;
+}
+
+async function refreshItems(): Promise<string | null> {
+  try {
+    await loadItems();
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Could not refresh the Reading List.";
+  }
 }
 
 importButton.addEventListener("click", () => fileInput.click());
@@ -51,25 +67,33 @@ fileInput.addEventListener("change", async () => {
   showStatus("Importing bookmarks...");
 
   try {
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      throw new Error("Import files must be 10 MB or smaller.");
+    }
     const entries = parseBookmarksHtml(await file.text());
     const existingUrls = new Set((await chrome.readingList.query({})).map((item) => item.url));
     const additions = entries.filter((entry) => !existingUrls.has(entry.url));
-    const results = await Promise.allSettled(
-      additions.map((entry) => chrome.readingList.addEntry(entry)),
+    const results = await settleWithConcurrency(
+      additions,
+      OPERATION_CONCURRENCY,
+      (entry) => chrome.readingList.addEntry(entry),
+      (completed, total) => showStatus(`Importing bookmarks... ${completed}/${total}`),
     );
     const imported = results.filter((result) => result.status === "fulfilled").length;
     const failed = results.length - imported;
-    showStatus(
+    const message =
       entries.length === 0
         ? "No valid web links found in that file."
-        : `Imported ${imported}; skipped ${entries.length - additions.length + failed}.`,
-      entries.length === 0 || failed > 0,
+        : `Imported ${imported}; skipped ${entries.length - additions.length}; failed ${failed}.`;
+    const refreshError = await refreshItems();
+    showStatus(
+      refreshError ? `${message} ${refreshError}` : message,
+      entries.length === 0 || failed > 0 || !!refreshError,
     );
   } catch (error) {
     showStatus(error instanceof Error ? error.message : "Import failed.", true);
   } finally {
     setBusy(false);
-    await loadItems();
   }
 });
 
@@ -95,47 +119,57 @@ exportButton.addEventListener("click", async () => {
     showStatus(error instanceof Error ? error.message : "Export failed.", true);
   } finally {
     setBusy(false);
-    await loadItems();
   }
 });
 
 deleteButton.addEventListener("click", async () => {
-  const items = await chrome.readingList.query({});
+  if (busy) return;
+  setBusy(true);
+  let items: ReadingListItem[];
+  try {
+    items = await chrome.readingList.query({});
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : "Could not read the Reading List.", true);
+    setBusy(false);
+    return;
+  }
   if (
     items.length === 0 ||
     !window.confirm(
       `Clear all ${items.length} ${items.length === 1 ? "item" : "items"} from Chrome Reading List? This cannot be undone.`,
     )
-  )
+  ) {
+    setBusy(false);
     return;
+  }
 
-  setBusy(true);
   showStatus("Clearing Reading List...");
 
-  const results = await Promise.allSettled(
-    items.map((item) => chrome.readingList.removeEntry({ url: item.url })),
-  );
-  const failed = results.filter((result) => result.status === "rejected").length;
-
   try {
-    await loadItems();
-    showStatus(
+    const results = await settleWithConcurrency(
+      items,
+      OPERATION_CONCURRENCY,
+      (item) => chrome.readingList.removeEntry({ url: item.url }),
+      (completed, total) => showStatus(`Clearing Reading List... ${completed}/${total}`),
+    );
+    const failed = results.filter((result) => result.status === "rejected").length;
+    const message =
       failed === 0
         ? "Reading List cleared."
-        : `Removed ${results.length - failed} items; ${failed} could not be removed.`,
-      failed > 0,
-    );
+        : `Removed ${results.length - failed} items; ${failed} could not be removed.`;
+    const refreshError = await refreshItems();
+    showStatus(refreshError ? `${message} ${refreshError}` : message, failed > 0 || !!refreshError);
   } catch (error) {
-    showStatus(
-      error instanceof Error ? error.message : "Could not refresh the Reading List.",
-      true,
-    );
+    showStatus(error instanceof Error ? error.message : "Could not clear the Reading List.", true);
   } finally {
     setBusy(false);
-    await loadItems();
   }
 });
 
-void loadItems().catch((error: unknown) => {
-  showStatus(error instanceof Error ? error.message : "Could not read the Reading List.", true);
-});
+void loadItems()
+  .then(() => {
+    document.documentElement.dataset["extensionReady"] = "true";
+  })
+  .catch((error: unknown) => {
+    showStatus(error instanceof Error ? error.message : "Could not read the Reading List.", true);
+  });

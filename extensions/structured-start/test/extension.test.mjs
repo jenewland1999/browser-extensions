@@ -7,7 +7,10 @@ import {
   BACKGROUND_PATTERNS,
   applySkinTone,
   inferNameFromUrl,
+  MAX_BACKGROUND_DATA_URL_LENGTH,
+  MAX_ICON_DATA_URL_LENGTH,
   MAX_DEPTH,
+  normalizeImageDataUrl,
   parseImport,
   THEMES,
 } from "../dist/model.js";
@@ -22,7 +25,18 @@ test("build emits loadable new tab extension", async () => {
   assert.ok(files.includes("icons/icon-16.png"));
   assert.ok(files.includes("icons/icon-128.png"));
   assert.ok(files.includes("fonts/geist-latin-wght-normal.woff2"));
+  assert.ok(files.includes("licenses/LICENSE-Geist-OFL.txt"));
+  assert.ok(files.includes("licenses/LICENSE-unicode-emoji-json-MIT.txt"));
   assert.ok(files.every((path) => !path.endsWith(".ts")));
+});
+
+test("packages required third-party notices in the extension", async () => {
+  const [geist, emoji] = await Promise.all([
+    readFile("dist/licenses/LICENSE-Geist-OFL.txt", "utf8"),
+    readFile("dist/licenses/LICENSE-unicode-emoji-json-MIT.txt", "utf8"),
+  ]);
+  assert.match(geist, /SIL OPEN FONT LICENSE Version 1\.1/);
+  assert.match(emoji, /Copyright \(c\) 2019 Mu-An Chiou/);
 });
 
 test("registers packaged extension icons", () => {
@@ -144,7 +158,8 @@ test("normalizes new appearance and link settings", () => {
     backgroundPattern: "cubes",
     backgroundType: "pattern",
     backgroundColor: "#eff6ff",
-    backgroundImage: "data:image/png;base64,abc",
+    backgroundImage:
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lK3Q6wAAAABJRU5ErkJggg==",
     inspectorMode: "docked",
     inspectorSide: "left",
     showItemCounts: false,
@@ -328,7 +343,7 @@ test("favicons use theme-aware contrast treatment", async () => {
     readFile("dist/newtab.js", "utf8"),
     readFile("dist/newtab.css", "utf8"),
   ]);
-  assert.match(script, /class="favicon"/);
+  assert.match(script, /image\.className = "favicon"/);
   assert.match(script, /theme=\$\{faviconTheme\}/);
   assert.doesNotMatch(css, /\.favicon[^}]+drop-shadow/s);
   assert.match(css, /\.favicon-backed/);
@@ -540,6 +555,94 @@ test("returning empty state preserves toolbar and background", async () => {
 test("rejects imports without sections", () => {
   assert.throws(() => parseImport({ hello: "world" }), /Unsupported JSON format/);
   assert.throws(() => parseImport([]), /No sections found/);
+});
+
+test("rejects hostile and malformed imported image data", () => {
+  const hostileSvg =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  const externalSvg =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://evil.test/a"/></svg>',
+    );
+  for (const image of [
+    hostileSvg,
+    externalSvg,
+    "data:image/svg+xml,<svg onload=alert(1)></svg>",
+    "data:image/png;base64,PHN2Zz48L3N2Zz4=",
+    `data:image/png;base64,${btoa("\x89PNG\r\n\x1a\ntruncated")}`,
+    "data:text/html;base64,PHNjcmlwdD4=",
+  ]) {
+    const imported = parseImport({
+      version: 1,
+      backgroundImage: image,
+      sections: [
+        {
+          id: "section",
+          type: "section",
+          children: [{ id: "link", type: "link", icon: image }],
+        },
+      ],
+    });
+    assert.equal(imported.backgroundImage, "");
+    assert.equal(imported.sections[0]?.children[0]?.icon, "");
+  }
+});
+
+test("canonicalizes valid image data and enforces persisted URL boundaries", () => {
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lK3Q6wAAAABJRU5ErkJggg==";
+  assert.equal(normalizeImageDataUrl(png, MAX_ICON_DATA_URL_LENGTH), png);
+  assert.equal(normalizeImageDataUrl(png, png.length - 1), "");
+  assert.equal(normalizeImageDataUrl(png, MAX_BACKGROUND_DATA_URL_LENGTH), png);
+  const svg =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h1v1z"/></svg>');
+  assert.equal(
+    decodeURIComponent(normalizeImageDataUrl(svg, 10_000).split(",")[1]),
+    '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h1v1z"/></svg>',
+  );
+});
+
+test("bounds hostile imported names without changing their text", () => {
+  const name = `"><img src=x onerror=alert(1)>${"x".repeat(600)}`;
+  const imported = parseImport({
+    version: 1,
+    sections: [{ id: "section", type: "section", name, children: [] }],
+  });
+  assert.equal(imported.sections[0]?.name, name.slice(0, 500));
+});
+
+test("uses synchronized conflict-safe layout persistence", async () => {
+  const [script, persistence] = await Promise.all([
+    readFile("dist/newtab.js", "utf8"),
+    readFile("dist/persistence.js", "utf8"),
+  ]);
+  assert.match(script, /chrome\.storage\.onChanged\.addListener/);
+  assert.match(script, /navigator\.locks\.request\(STORAGE_LOCK/);
+  assert.match(script, /assertStorageFits/);
+  assert.match(persistence, /currentRevision !== this\.#revision/);
+  assert.match(script, /without overwriting it/);
+  assert.match(script, /storageVersion: 1/);
+});
+
+test("custom images and imported names are assigned through DOM APIs", async () => {
+  const script = await readFile("dist/newtab.js", "utf8");
+  assert.match(script, /image\.src = node\.icon/);
+  assert.match(script, /tileName\.textContent = node\.name/);
+  assert.match(script, /setAttribute\("aria-label", `Select \$\{node\.name\}`\)/);
+  assert.doesNotMatch(script, /<img src="\$\{node\.icon\}/);
+  assert.doesNotMatch(script, /aria-label="Select \$\{escapeHtml\(node\.name\)/);
+});
+
+test("enhanced selects use one document listener and clean detached lists", async () => {
+  const script = await readFile("dist/newtab.js", "utf8");
+  const enhanceStart = script.indexOf("function enhanceSelects");
+  const enhanceEnd = script.indexOf("function showToast", enhanceStart);
+  assert.doesNotMatch(script.slice(enhanceStart, enhanceEnd), /document\.addEventListener/);
+  assert.match(script, /select\.dispatchEvent\(new Event\("select-close"\)\)/);
+  assert.match(script, /select\.addEventListener\("select-close", close\)/);
 });
 
 test("limits imported nesting depth", () => {

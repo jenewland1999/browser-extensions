@@ -2,12 +2,13 @@
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
     "build": {
+      "inputs": ["$TURBO_DEFAULT$", "!README.md", "!SECURITY.md", "!test/**"],
       "outputs": ["dist/**"]
     },
     "lint": {
       "outputs": []
     },
-    "test": {
+    "test:unit": {
       "dependsOn": ["build"],
       "outputs": []
     },

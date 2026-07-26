@@ -1,9 +1,15 @@
 import {
+  assertCaptureTabUnchanged,
+  CaptureLock,
+  captureWithVerification,
   createCaptureTiles,
   createFilename,
   defaultSettings,
   normalizeSettings,
+  validateCanvasDimensions,
+  validatePageMetrics,
   type CaptureSettings,
+  type CaptureTabIdentity,
   type PageMetrics,
 } from "./capture.js";
 
@@ -14,15 +20,32 @@ interface CaptureResult {
 }
 
 let captureResult: CaptureResult | undefined;
+const captureLock = new CaptureLock();
+const captureInProgressMessage = "A screenshot capture is already in progress.";
 
-async function getActiveTab(): Promise<chrome.tabs.Tab> {
+async function getActiveTab(): Promise<chrome.tabs.Tab & CaptureTabIdentity> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id === undefined || tab.windowId === undefined)
+  if (tab?.id === undefined || tab.windowId === undefined || !tab.url)
     throw new Error("No active browser tab found.");
   if (tab.url?.startsWith("chrome://") || tab.url?.startsWith("edge://")) {
     throw new Error("Browser pages cannot be captured. Open a website first.");
   }
-  return tab;
+  return tab as chrome.tabs.Tab & CaptureTabIdentity;
+}
+
+async function verifyCaptureTab(tab: CaptureTabIdentity): Promise<void> {
+  const current = await chrome.tabs.get(tab.id).catch(() => undefined);
+  assertCaptureTabUnchanged(
+    tab,
+    current?.id === undefined || current.windowId === undefined || !current.url
+      ? undefined
+      : {
+          id: current.id,
+          windowId: current.windowId,
+          url: current.url,
+          active: current.active,
+        },
+  );
 }
 
 async function download(
@@ -136,14 +159,21 @@ async function executeOnTab<T>(
 
 async function captureViewport(settings: CaptureSettings): Promise<void> {
   const tab = await getActiveTab();
-  const canvas = new OffscreenCanvas(1, 1);
-  const image = await dataUrlToImage(
-    await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }),
+  const dataUrl = await captureWithVerification(
+    () => verifyCaptureTab(tab),
+    () => chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }),
   );
-  canvas.width = image.width;
-  canvas.height = image.height;
-  canvas.getContext("2d")?.drawImage(image, 0, 0);
-  image.close();
+  const image = await dataUrlToImage(dataUrl);
+  let canvas: OffscreenCanvas;
+  try {
+    validateCanvasDimensions(image.width, image.height);
+    canvas = new OffscreenCanvas(image.width, image.height);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not create screenshot canvas.");
+    context.drawImage(image, 0, 0);
+  } finally {
+    image.close();
+  }
   await download(await canvasToDataUrl(canvas, settings), settings, tab, "viewport");
 }
 
@@ -178,47 +208,58 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
   const tab = await getActiveTab();
   const tabId = tab.id as number;
   const pageState = await executeOnTab<PageState>(tabId, preparePageForCapture);
-  const metrics = await executeOnTab<PageMetrics>(tabId, readPageMetrics);
-  const tiles = createCaptureTiles(metrics);
   let canvas: OffscreenCanvas | undefined;
   let context: OffscreenCanvasRenderingContext2D | null = null;
-  let scale = 1;
-  let lastCaptureTime = 0;
 
   try {
+    const metrics = await executeOnTab<PageMetrics>(tabId, readPageMetrics);
+    validatePageMetrics(metrics);
+    validateCanvasDimensions(metrics.width, metrics.height);
+    const tiles = createCaptureTiles(metrics);
+    let scale = 1;
+    let lastCaptureTime = 0;
+
     for (const [index, tile] of tiles.entries()) {
       await executeOnTab(tabId, scrollPage, [tile.scrollX, tile.scrollY] as never[]);
       if (index > 0) await executeOnTab(tabId, hideViewportElements);
       await wait(Math.max(0, 600 - (Date.now() - lastCaptureTime)));
-      const image = await dataUrlToImage(
-        await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }),
+      const dataUrl = await captureWithVerification(
+        () => verifyCaptureTab(tab),
+        () => chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }),
       );
+      const image = await dataUrlToImage(dataUrl);
       lastCaptureTime = Date.now();
 
-      if (!canvas) {
-        scale = image.width / metrics.viewportWidth;
-        canvas = new OffscreenCanvas(
-          Math.round(metrics.width * scale),
-          Math.round(metrics.height * scale),
-        );
-        context = canvas.getContext("2d");
-        if (!context) throw new Error("Could not create screenshot canvas.");
-      }
+      try {
+        if (!canvas) {
+          scale = image.width / metrics.viewportWidth;
+          if (!Number.isFinite(scale) || scale <= 0) {
+            throw new Error("The browser returned an invalid screenshot scale.");
+          }
+          const canvasWidth = Math.round(metrics.width * scale);
+          const canvasHeight = Math.round(metrics.height * scale);
+          validateCanvasDimensions(canvasWidth, canvasHeight);
+          canvas = new OffscreenCanvas(canvasWidth, canvasHeight);
+          context = canvas.getContext("2d");
+          if (!context) throw new Error("Could not create screenshot canvas.");
+        }
 
-      const width = Math.min(image.width, Math.round(tile.width * scale));
-      const height = Math.min(image.height, Math.round(tile.height * scale));
-      context?.drawImage(
-        image,
-        Math.round(tile.sourceX * scale),
-        Math.round(tile.sourceY * scale),
-        width,
-        height,
-        Math.round(tile.x * scale),
-        Math.round(tile.y * scale),
-        width,
-        height,
-      );
-      image.close();
+        const width = Math.min(image.width, Math.round(tile.width * scale));
+        const height = Math.min(image.height, Math.round(tile.height * scale));
+        context?.drawImage(
+          image,
+          Math.round(tile.sourceX * scale),
+          Math.round(tile.sourceY * scale),
+          width,
+          height,
+          Math.round(tile.x * scale),
+          Math.round(tile.y * scale),
+          width,
+          height,
+        );
+      } finally {
+        image.close();
+      }
     }
   } finally {
     await executeOnTab(tabId, restoreViewportElements).catch(() => undefined);
@@ -238,17 +279,20 @@ async function runCapture(captureType: CaptureType, settings: CaptureSettings): 
   else await captureViewport(settings);
 }
 
-function trackCapture(operation: Promise<void>): void {
-  void operation
-    .then(() => {
-      captureResult = { saved: true };
-    })
-    .catch((error: unknown) => {
-      captureResult = { error: error instanceof Error ? error.message : "Screenshot failed." };
-    })
-    .finally(() => {
-      void chrome.action.openPopup().catch(() => undefined);
-    });
+async function performCapture(
+  captureType: CaptureType,
+  settings?: CaptureSettings,
+): Promise<CaptureResult> {
+  const release = captureLock.tryAcquire();
+  if (!release) return { error: captureInProgressMessage };
+  try {
+    await runCapture(captureType, settings ?? (await getSettings()));
+    return { saved: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Screenshot failed." };
+  } finally {
+    release();
+  }
 }
 
 chrome.runtime.onMessage.addListener(
@@ -264,14 +308,17 @@ chrome.runtime.onMessage.addListener(
     }
     if (message.type !== "capture") return false;
     const settings = normalizeSettings(message.settings);
-    sendResponse({});
-    trackCapture(runCapture(message.captureType ?? "viewport", settings));
-    return false;
+    const captureType = message.captureType === "full-page" ? "full-page" : "viewport";
+    void performCapture(captureType, settings).then(sendResponse);
+    return true;
   },
 );
 
 chrome.commands.onCommand.addListener((command) => {
   if (command !== "capture-viewport" && command !== "capture-full-page") return;
   const captureType = command === "capture-full-page" ? "full-page" : "viewport";
-  trackCapture(getSettings().then((settings) => runCapture(captureType, settings)));
+  void performCapture(captureType).then((result) => {
+    captureResult = result;
+    void chrome.action.openPopup().catch(() => undefined);
+  });
 });

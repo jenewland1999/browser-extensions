@@ -1,4 +1,6 @@
 export const MAX_DEPTH = 16;
+export const MAX_ICON_DATA_URL_LENGTH = 1_000_000;
+export const MAX_BACKGROUND_DATA_URL_LENGTH = 8_000_000;
 
 export type Direction = "horizontal" | "vertical";
 export const THEMES = [
@@ -189,7 +191,7 @@ export function createLink(): LinkNode {
 }
 
 function text(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 500) : fallback;
 }
 
 function grow(value: unknown): number {
@@ -207,10 +209,71 @@ function spacing(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? Math.min(48, Math.max(0, Math.round(parsed))) : fallback;
 }
 
-function localImage(value: unknown, maxLength: number): string {
-  return typeof value === "string" && value.startsWith("data:image/") && value.length <= maxLength
-    ? value
-    : "";
+function hasImageSignature(mime: string, binary: string): boolean {
+  const bytes = Array.from(binary.slice(0, 12), (character) => character.charCodeAt(0));
+  if (mime === "png") {
+    return (
+      bytes.slice(0, 8).join(",") === "137,80,78,71,13,10,26,10" &&
+      binary.endsWith("\0\0\0\0IEND\xaeB\x60\x82")
+    );
+  }
+  if (mime === "jpeg") {
+    return (
+      bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff && binary.endsWith("\xff\xd9")
+    );
+  }
+  if (mime === "gif") {
+    return (binary.startsWith("GIF87a") || binary.startsWith("GIF89a")) && binary.endsWith(";");
+  }
+  if (!binary.startsWith("RIFF") || binary.slice(8, 12) !== "WEBP") return false;
+  const declaredSize = bytes[4]! | (bytes[5]! << 8) | (bytes[6]! << 16) | ((bytes[7]! << 24) >>> 0);
+  return declaredSize === binary.length - 8;
+}
+
+function hasUnsafeControl(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) return true;
+  }
+  return false;
+}
+
+export function normalizeImageDataUrl(value: unknown, maxLength: number): string {
+  if (typeof value !== "string" || value.length > maxLength) return "";
+  const raster = /^data:image\/(png|jpeg|gif|webp);base64,([a-z\d+/]+={0,2})$/i.exec(value);
+  if (raster) {
+    const mime = raster[1]?.toLowerCase();
+    const payload = raster[2];
+    if (!mime || !payload || payload.length % 4 !== 0) return "";
+    try {
+      const binary = atob(payload);
+      if (!hasImageSignature(mime, binary)) return "";
+      const normalized = `data:image/${mime};base64,${btoa(binary)}`;
+      return normalized.length <= maxLength ? normalized : "";
+    } catch {
+      return "";
+    }
+  }
+
+  const prefix = "data:image/svg+xml;charset=utf-8,";
+  if (!value.toLowerCase().startsWith(prefix)) return "";
+  try {
+    const source = decodeURIComponent(value.slice(prefix.length)).trim();
+    if (
+      !/^<svg(?:\s|>)/i.test(source) ||
+      !/<\/svg>$/i.test(source) ||
+      hasUnsafeControl(source) ||
+      /<!doctype|<!entity|<\/?(?:script|style|foreignobject|iframe|object|embed)(?:\s|>)/i.test(
+        source,
+      ) ||
+      /\son[a-z\d_-]+\s*=|(?:href|xlink:href)\s*=\s*["'](?!#)|url\(\s*(?!["']?#)/i.test(source)
+    )
+      return "";
+    const normalized = `${prefix}${encodeURIComponent(source)}`;
+    return normalized.length <= maxLength ? normalized : "";
+  } catch {
+    return "";
+  }
 }
 
 function hexColor(value: unknown): string {
@@ -307,8 +370,10 @@ function normalizeNode(value: unknown, depth: number): Node | undefined {
       unmodifiedDuplicate: input.unmodifiedDuplicate === true,
       url: safeUrl(input.url),
       icon:
-        localImage(input.icon, 1_000_000) ||
-        (typeof input.icon === "string" ? input.icon.slice(0, 32) : ""),
+        normalizeImageDataUrl(input.icon, MAX_ICON_DATA_URL_LENGTH) ||
+        (typeof input.icon === "string" && !input.icon.toLowerCase().startsWith("data:")
+          ? input.icon.slice(0, 32)
+          : ""),
       faviconBackgroundLight:
         input.faviconBackgroundLight === true || legacyFaviconBackground === true,
       faviconBackgroundDark:
@@ -351,7 +416,10 @@ function normalizeCurrent(value: unknown): StartPageData | undefined {
   if (!value || typeof value !== "object") return undefined;
   const input = value as Partial<StartPageData>;
   const backgroundPattern = (value as { backgroundPattern?: unknown }).backgroundPattern;
-  const backgroundImage = localImage(input.backgroundImage, 8_000_000);
+  const backgroundImage = normalizeImageDataUrl(
+    input.backgroundImage,
+    MAX_BACKGROUND_DATA_URL_LENGTH,
+  );
   const removedPatterns = new Set([
     "plain",
     "triangles",

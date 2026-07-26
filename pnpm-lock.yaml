@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
       oxfmt:
         specifier: 0.60.0
         version: 0.60.0
@@ -477,6 +480,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  fflate@0.8.2:
+    resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
+
   oxfmt@0.60.0:
     resolution: {integrity: sha512-fViX6i+gJuZWY+jI/fnR6WRbRj70GZ9RlCd30MygJrHTUNc4DxvKHWw8vBjMjffv3PgU5qWDR0AzmojQByqaZA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -729,6 +735,8 @@ snapshots:
 
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
+
+  fflate@0.8.2: {}
 
   oxfmt@0.60.0:
     dependencies:

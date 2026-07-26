@@ -3,9 +3,17 @@ import { cpSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 const outputDirectory = resolve("dist");
-const staticPaths = ["manifest.json", "popup.html", "popup.css", "rules", "icons"];
+const staticPaths = [
+  "manifest.json",
+  "popup.html",
+  "popup.css",
+  "THIRD_PARTY_NOTICES.md",
+  "rules",
+  "icons",
+];
 const archiveFiles = [
   "manifest.json",
+  "THIRD_PARTY_NOTICES.md",
   "background.js",
   "content.js",
   "redirect.js",

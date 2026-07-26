@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { createBookmarksHtml, createExportFilename } from "../dist/export.js";
+import {
+  createBookmarksHtml,
+  createExportFilename,
+  settleWithConcurrency,
+} from "../dist/export.js";
 
 const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 
@@ -52,4 +56,33 @@ test("creates a dated export filename", () => {
     createExportFilename(new Date("2026-07-25T12:00:00.000Z")),
     "chrome-reading-list-2026-07-25.html",
   );
+});
+
+test("settles operations with bounded concurrency and progress", async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const progress = [];
+  const results = await settleWithConcurrency(
+    [0, 1, 2, 3, 4],
+    2,
+    async (value) => {
+      active++;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active--;
+      if (value === 3) throw new Error("failed");
+    },
+    (completed, total) => progress.push([completed, total]),
+  );
+
+  assert.equal(maximumActive, 2);
+  assert.deepEqual(
+    results.map(({ status }) => status),
+    ["fulfilled", "fulfilled", "fulfilled", "rejected", "fulfilled"],
+  );
+  assert.deepEqual(progress.at(-1), [5, 5]);
+});
+
+test("rejects invalid concurrency", async () => {
+  await assert.rejects(() => settleWithConcurrency([], 0, async () => {}), RangeError);
 });

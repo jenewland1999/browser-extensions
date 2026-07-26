@@ -14,6 +14,100 @@ export const defaultSettings: CaptureSettings = {
   quality: 90,
 };
 
+export const captureLimits = {
+  maxCanvasDimension: 32_767,
+  maxCanvasBytes: 256 * 1024 * 1024,
+} as const;
+
+export interface CaptureTabIdentity {
+  id: number;
+  windowId: number;
+  url: string;
+  active: boolean;
+}
+
+const pad = (value: number): string => String(value).padStart(2, "0");
+
+export class CaptureLock {
+  private locked = false;
+
+  tryAcquire(): (() => void) | undefined {
+    if (this.locked) return undefined;
+    this.locked = true;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.locked = false;
+    };
+  }
+}
+
+export function assertCaptureTabUnchanged(
+  expected: CaptureTabIdentity,
+  actual: CaptureTabIdentity | undefined,
+): void {
+  if (!actual || actual.id !== expected.id) {
+    throw new Error("Capture stopped because the original tab is no longer active.");
+  }
+  if (!actual.active || actual.windowId !== expected.windowId) {
+    throw new Error("Capture stopped because the original tab changed windows or is not active.");
+  }
+  if (actual.url !== expected.url) {
+    throw new Error("Capture stopped because the original page URL changed.");
+  }
+}
+
+export async function captureWithVerification<T>(
+  verify: () => Promise<void>,
+  capture: () => Promise<T>,
+): Promise<T> {
+  await verify();
+  const result = await capture();
+  await verify();
+  return result;
+}
+
+export function validatePageMetrics(metrics: PageMetrics): void {
+  for (const [name, value] of [
+    ["page width", metrics.width],
+    ["page height", metrics.height],
+    ["viewport width", metrics.viewportWidth],
+    ["viewport height", metrics.viewportHeight],
+  ] as const) {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new Error(`Invalid ${name} reported by the page: ${String(value)}.`);
+    }
+  }
+  if (!Number.isFinite(metrics.scrollX) || !Number.isFinite(metrics.scrollY)) {
+    throw new Error("Invalid scroll position reported by the page.");
+  }
+}
+
+export function validateCanvasDimensions(
+  width: number,
+  height: number,
+  limits: { maxCanvasDimension: number; maxCanvasBytes: number } = captureLimits,
+): number {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) {
+    throw new Error(`Invalid screenshot canvas dimensions: ${width} x ${height}.`);
+  }
+  if (width > limits.maxCanvasDimension || height > limits.maxCanvasDimension) {
+    throw new Error(
+      `Screenshot is too large (${width} x ${height}px). Each canvas dimension must be ${limits.maxCanvasDimension}px or less.`,
+    );
+  }
+  const estimatedBytes = width * height * 4;
+  if (!Number.isSafeInteger(estimatedBytes) || estimatedBytes > limits.maxCanvasBytes) {
+    const estimatedMiB = Math.ceil(estimatedBytes / (1024 * 1024));
+    const maximumMiB = Math.floor(limits.maxCanvasBytes / (1024 * 1024));
+    throw new Error(
+      `Screenshot is too large (${width} x ${height}px, about ${estimatedMiB} MiB). The canvas memory limit is ${maximumMiB} MiB.`,
+    );
+  }
+  return estimatedBytes;
+}
+
 export function createFilename(
   date: Date,
   format: ScreenshotFormat = "png",
@@ -21,7 +115,6 @@ export function createFilename(
   captureType: "viewport" | "full-page" = "viewport",
   template = defaultSettings.filenameTemplate,
 ): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
   const extension = format === "jpeg" ? "jpg" : format;
   const safeHostname =
     hostname
@@ -66,6 +159,7 @@ export function normalizeSettings(value: Partial<CaptureSettings> = {}): Capture
 }
 
 export function createCaptureTiles(metrics: PageMetrics): CaptureTile[] {
+  validatePageMetrics(metrics);
   const tiles: CaptureTile[] = [];
 
   for (let y = 0; y < metrics.height; y += metrics.viewportHeight) {

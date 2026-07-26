@@ -5,6 +5,48 @@ export interface ReadingListItem {
   creationTime: number;
 }
 
+export const MAX_IMPORT_FILE_BYTES = 10 * 1_024 * 1_024;
+export const MAX_IMPORT_ENTRIES = 10_000;
+export const OPERATION_CONCURRENCY = 8;
+
+export async function settleWithConcurrency<T>(
+  items: readonly T[],
+  concurrency: number,
+  operation: (item: T, index: number) => Promise<void>,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<PromiseSettledResult<void>[]> {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new RangeError("Concurrency must be a positive integer.");
+  }
+
+  const results: PromiseSettledResult<void>[] = Array.from({ length: items.length }, () => ({
+    status: "fulfilled",
+    value: undefined,
+  }));
+  let nextIndex = 0;
+  let completed = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      const item = items[index]!;
+
+      try {
+        await operation(item, index);
+        results[index] = { status: "fulfilled", value: undefined };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+      onProgress?.(++completed, items.length);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, async () => worker()),
+  );
+  return results;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -63,6 +105,9 @@ export function parseBookmarksHtml(html: string): Omit<ReadingListItem, "creatio
     }
 
     if (!["http:", "https:"].includes(url.protocol) || urls.has(url.href)) continue;
+    if (entries.length === MAX_IMPORT_ENTRIES) {
+      throw new Error(`Import files can contain at most ${MAX_IMPORT_ENTRIES} web links.`);
+    }
     urls.add(url.href);
     entries.push({
       title: link.textContent?.trim() || url.href,

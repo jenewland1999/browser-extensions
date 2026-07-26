@@ -55,18 +55,23 @@ async function saveSettings(): Promise<CaptureSettings> {
 for (const button of buttons) {
   button.addEventListener("click", async () => {
     const captureType = button.dataset["capture"] as CaptureType;
+    for (const item of buttons) item.disabled = true;
+    status.classList.remove("error");
+    status.textContent = "Capturing...";
 
     try {
       const settings = await saveSettings();
-      await chrome.runtime.sendMessage({
+      const response = (await chrome.runtime.sendMessage({
         type: "capture",
         captureType,
         settings,
-      });
-      window.close();
+      })) as { error?: string; saved?: boolean };
+      if (response.error) throw new Error(response.error);
+      status.textContent = response.saved ? "Saved." : "Screenshot failed.";
     } catch (error) {
       status.classList.add("error");
       status.textContent = error instanceof Error ? error.message : "Screenshot failed.";
+    } finally {
       for (const item of buttons) item.disabled = false;
     }
   });
@@ -87,6 +92,7 @@ void Promise.all([loadSettings(), chrome.commands.getAll()]).then(([, commands])
     shortcut.textContent = command.shortcut ?? "";
     shortcut.hidden = !command.shortcut;
   }
+  document.documentElement.dataset["extensionReady"] = "true";
 });
 
 void chrome.runtime

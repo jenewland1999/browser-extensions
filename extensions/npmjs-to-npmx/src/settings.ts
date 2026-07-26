@@ -53,7 +53,27 @@ export async function applySettings(settings: Settings): Promise<void> {
 
 export async function saveSettings(value: unknown): Promise<Settings> {
   const settings = normalizeSettings(value);
-  await chrome.storage.local.set({ settings });
-  await applySettings(settings);
+  const previousSettings = await getSettings();
+
+  try {
+    await applySettings(settings);
+    await chrome.storage.local.set({ settings });
+  } catch (error) {
+    const rollback = await Promise.allSettled([
+      applySettings(previousSettings),
+      chrome.storage.local.set({ settings: previousSettings }),
+    ]);
+    const rollbackErrors = rollback.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : [],
+    );
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...rollbackErrors],
+        "Could not save settings or fully restore the previous settings.",
+      );
+    }
+    throw error;
+  }
+
   return settings;
 }

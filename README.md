@@ -5,17 +5,20 @@ Turborepo.
 
 ## Extensions
 
-| Extension                                       | Description                                      |
-| ----------------------------------------------- | ------------------------------------------------ |
-| [`npmjs-to-npmx`](extensions/npmjs-to-npmx)     | Redirect compatible npmjs.com pages to npmx.dev. |
-| [`page-screenshot`](extensions/page-screenshot) | Capture viewport and full-page screenshots.      |
-| [`Tessera`](extensions/structured-start)        | Build a nested, local-only new tab workspace.    |
+| Extension                                          | Description                                            |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| [`npmjs-to-npmx`](extensions/npmjs-to-npmx)        | Redirect compatible npmjs.com pages to npmx.dev.       |
+| [`page-screenshot`](extensions/page-screenshot)    | Capture viewport and full-page screenshots.            |
+| [`Reading List`](extensions/reading-list-exporter) | Import, export, and clear Chrome Reading List entries. |
+| [`Tessera`](extensions/structured-start)           | Build a nested, local-only new tab workspace.          |
 
 ## Requirements
 
 - Node.js 24 or newer
 - pnpm 11.17.0
-- `zip` for extension archives
+- `zip` for the extension workspace build scripts; root archive normalization
+  and validation do not require `unzip`
+- Chrome for Testing or Chromium for the unpacked-extension smoke test
 
 ## Commands
 
@@ -24,8 +27,13 @@ pnpm install --frozen-lockfile
 pnpm validate
 ```
 
-`pnpm validate` formats repository, then runs lint, type checking, build, and
-test tasks across all extension workspaces through Turborepo.
+`pnpm validate` checks formatting without changing files, then runs lint, type
+checking, build, tests, and exact ZIP-content checks. Run `pnpm format` to apply
+formatting and `pnpm smoke:chromium` to launch Chrome for Testing or Chromium
+with all four built extensions loaded unpacked.
+
+Root builds rewrite the generated archives with fixed timestamps and entry
+ordering for deterministic, cross-platform ZIP output.
 
 Run one extension task with a workspace filter:
 

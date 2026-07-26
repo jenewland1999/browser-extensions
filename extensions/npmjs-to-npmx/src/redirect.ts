@@ -34,7 +34,14 @@ export function getOmniboxUrl(value: string): string {
     return `https://npmx.dev/search?q=${encodeURIComponent(searchQuery.trim())}`;
   }
 
-  return `https://npmx.dev/package/${encodeURI(query)}`;
+  const scopedPackage = query.match(/^(@[^/]+)\/([^/]+)$/);
+  const packagePath = scopedPackage
+    ? query
+        .split("/")
+        .map((component) => encodeURIComponent(component))
+        .join("/")
+    : encodeURIComponent(query);
+  return `https://npmx.dev/package/${packagePath}`;
 }
 
 export function escapeOmniboxText(value: string): string {
