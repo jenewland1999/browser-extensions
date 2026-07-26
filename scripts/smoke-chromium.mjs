@@ -56,6 +56,16 @@ async function evaluate(webSocketUrl, expression) {
         const message = JSON.parse(data);
         if (message.id !== 1) return;
         clearTimeout(timeout);
+        if (message.result.exceptionDetails) {
+          reject(
+            new Error(
+              message.result.exceptionDetails.exception?.description ??
+                message.result.exceptionDetails.text ??
+                "DevTools evaluation failed.",
+            ),
+          );
+          return;
+        }
         resolvePromise(message.result.result.value);
       });
     });
@@ -150,7 +160,7 @@ try {
 
   for (const extension of extensions) {
     const url = `chrome-extension://${extension.id}/${extension.page}`;
-    const response = await fetch(`${origin}/json/new?${encodeURIComponent(url)}`, {
+    const response = await fetch(`${origin}/json/new?${encodeURI(url)}`, {
       method: "PUT",
     });
     if (!response.ok) throw new Error(`Could not open ${url}: HTTP ${response.status}.`);
