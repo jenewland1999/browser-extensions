@@ -27,4 +27,4 @@ Selected background designs are adapted from [Hero Patterns](https://heropattern
 pnpm --filter @browser-extensions/tessera build
 ```
 
-Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, then select `extensions/structured-start/dist`.
+Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, then select `extensions/tessera/dist`.

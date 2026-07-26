@@ -10,7 +10,7 @@ Turborepo.
 | [`npmjs-to-npmx`](extensions/npmjs-to-npmx)        | Redirect compatible npmjs.com pages to npmx.dev.       |
 | [`page-screenshot`](extensions/page-screenshot)    | Capture viewport and full-page screenshots.            |
 | [`Reading List`](extensions/reading-list-exporter) | Import, export, and clear Chrome Reading List entries. |
-| [`Tessera`](extensions/structured-start)           | Build a nested, local-only new tab workspace.          |
+| [`Tessera`](extensions/tessera)                    | Build a nested, local-only new tab workspace.          |
 
 ## Requirements
 

@@ -61,7 +61,7 @@ export const archives = [
     ],
   },
   {
-    extension: "structured-start",
+    extension: "tessera",
     archive: "tessera.zip",
     page: "newtab.html",
     files: [
