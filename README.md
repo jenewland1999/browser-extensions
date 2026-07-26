@@ -9,6 +9,7 @@ Turborepo.
 | ----------------------------------------------- | ------------------------------------------------ |
 | [`npmjs-to-npmx`](extensions/npmjs-to-npmx)     | Redirect compatible npmjs.com pages to npmx.dev. |
 | [`page-screenshot`](extensions/page-screenshot) | Capture viewport and full-page screenshots.      |
+| [`Tessera`](extensions/structured-start)        | Build a nested, local-only new tab workspace.    |
 
 ## Requirements
 

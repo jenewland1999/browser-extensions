@@ -1,0 +1,23 @@
+{
+  "name": "@browser-extensions/tessera",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A calm, tile-based Chromium new tab workspace.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "oxlint src scripts test",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
+    "@types/chrome": "0.2.2",
+    "typescript": "7.0.2",
+    "unicode-emoji-json": "0.9.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

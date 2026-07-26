@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Tessera</title>
+    <link rel="stylesheet" href="newtab.css" />
+  </head>
+  <body>
+    <header id="toolbar" class="toolbar" aria-label="Page tools" hidden>
+      <button
+        class="toolbar-grip"
+        type="button"
+        data-icon="grip"
+        aria-label="Drag toolbar"
+        title="Drag toolbar; hold Shift to snap"
+      ></button>
+      <div class="brand" aria-label="Tessera">
+        <span class="brand-mark"></span>
+        <span>Tessera</span>
+      </div>
+      <div class="toolbar-divider"></div>
+      <button
+        class="tool standard-tool"
+        id="add-section"
+        type="button"
+        data-icon="panel-top"
+        title="Add section"
+      >
+        <span>Add section</span>
+      </button>
+      <button
+        class="tool standard-tool"
+        id="add-link"
+        type="button"
+        data-icon="link"
+        title="Add link"
+      >
+        <span>Add link</span>
+      </button>
+      <button
+        class="tool standard-tool"
+        id="select-items"
+        type="button"
+        data-icon="pencil"
+        title="Edit items"
+      >
+        <span>Edit</span>
+      </button>
+      <button
+        class="tool standard-tool"
+        id="expand-all"
+        type="button"
+        data-icon="maximize"
+        title="Expand all sections"
+      >
+        <span>Expand all</span>
+      </button>
+      <button
+        class="tool standard-tool"
+        id="collapse-all"
+        type="button"
+        data-icon="minimize"
+        title="Collapse all sections"
+      >
+        <span>Collapse all</span>
+      </button>
+      <div class="toolbar-divider action-divider"></div>
+      <button class="tool selection-tool" id="cancel-selection" type="button" data-icon="x" hidden>
+        <span>Cancel</span>
+      </button>
+      <button
+        class="tool selection-delete"
+        id="delete-selected"
+        type="button"
+        data-icon="trash"
+        title="Delete selected items"
+        hidden
+      >
+        <span>Delete <b id="selection-count">0</b></span>
+      </button>
+      <div class="toolbar-spacer"></div>
+      <button
+        class="icon-button"
+        id="lock"
+        type="button"
+        data-icon="unlock"
+        title="Lock layout"
+        aria-label="Lock layout"
+      ></button>
+      <button
+        class="icon-button"
+        id="settings"
+        type="button"
+        data-icon="settings-2"
+        title="Open settings"
+        aria-label="Open settings"
+        aria-expanded="false"
+      ></button>
+      <button
+        class="icon-button"
+        id="minimize-toolbar"
+        type="button"
+        data-icon="minus"
+        title="Minimize toolbar"
+        aria-label="Minimize toolbar"
+      ></button>
+      <button
+        class="icon-button"
+        id="hide-toolbar"
+        type="button"
+        data-icon="eye-off"
+        title="Hide toolbar until next new tab"
+        aria-label="Hide toolbar until next new tab"
+      ></button>
+      <button
+        class="icon-button"
+        id="more-menu-button"
+        type="button"
+        data-icon="more-horizontal"
+        title="More options"
+        aria-label="More options"
+        aria-haspopup="menu"
+        aria-expanded="false"
+      ></button>
+      <div id="more-menu" class="more-menu" role="menu" hidden>
+        <a
+          role="menuitem"
+          href="https://github.com/jenewland1999/browser-extensions"
+          target="_blank"
+          >Repository</a
+        >
+        <a
+          role="menuitem"
+          href="https://github.com/jenewland1999/browser-extensions/issues/new?template=bug_report.md"
+          target="_blank"
+          >Report a bug</a
+        >
+        <a
+          role="menuitem"
+          href="https://github.com/jenewland1999/browser-extensions/issues/new?template=feature_request.md"
+          target="_blank"
+          >Request a feature</a
+        >
+        <button id="open-help" type="button" role="menuitem">Help</button>
+        <button id="fix-favicon-contrast" type="button" role="menuitem">
+          Fix favicon contrast
+        </button>
+        <hr />
+        <button id="reset-extension" class="menu-danger" type="button" role="menuitem">
+          Reset extension
+        </button>
+      </div>
+    </header>
+
+    <button
+      id="toolbar-orb"
+      class="toolbar-orb"
+      type="button"
+      title="Expand Tessera toolbar"
+      aria-label="Expand Tessera toolbar"
+      hidden
+    >
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="orb-name">Tessera</span>
+    </button>
+
+    <main id="canvas" class="canvas" aria-label="Start page sections"></main>
+
+    <aside id="panel" class="panel" aria-label="Settings" aria-hidden="true">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Inspector</p>
+          <h1 id="panel-title">Page settings</h1>
+        </div>
+        <button
+          class="icon-button"
+          id="close-panel"
+          type="button"
+          data-icon="x"
+          aria-label="Close settings"
+        ></button>
+      </div>
+      <div id="editor" class="editor"></div>
+      <div id="page-settings" class="page-settings">
+        <section class="settings-group">
+          <h2>Appearance</h2>
+          <label class="field">
+            <span>Theme</span>
+            <select id="theme">
+              <option value="system">Browser / system</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="rose-pine">Rosé Pine</option>
+              <option value="vercel">Vercel</option>
+              <option value="github-light">GitHub Light</option>
+              <option value="github-dark">GitHub Dark</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Density</span>
+            <select id="density">
+              <option value="compact">Compact</option>
+              <option value="comfortable">Comfortable</option>
+              <option value="spacious">Spacious</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <div id="custom-spacing" class="custom-spacing">
+            <label class="field range-field">
+              <span>Item gap</span>
+              <input id="item-gap" type="range" min="0" max="32" step="1" />
+              <output id="item-gap-value"></output>
+            </label>
+            <label class="field range-field">
+              <span>Section gap</span>
+              <input id="section-gap" type="range" min="0" max="32" step="1" />
+              <output id="section-gap-value"></output>
+            </label>
+            <label class="field range-field">
+              <span>Page padding</span>
+              <input id="page-padding" type="range" min="0" max="48" step="1" />
+              <output id="page-padding-value"></output>
+            </label>
+          </div>
+          <label class="field">
+            <span>Inspector layout</span>
+            <select id="inspector-mode">
+              <option value="floating">Floating</option>
+              <option value="docked">Docked</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Inspector position</span>
+            <select id="inspector-side">
+              <option value="right">Right</option>
+              <option value="left">Left</option>
+            </select>
+          </label>
+          <label class="field switch-field">
+            <span>Item counts</span>
+            <input id="show-item-counts" type="checkbox" role="switch" />
+            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+          </label>
+          <fieldset>
+            <legend>Background</legend>
+            <div class="segmented background-type">
+              <label
+                ><input name="background-type" type="radio" value="blank" /><span
+                  >Blank</span
+                ></label
+              >
+              <label
+                ><input name="background-type" type="radio" value="pattern" /><span
+                  >Pattern</span
+                ></label
+              >
+              <label
+                ><input name="background-type" type="radio" value="image" /><span
+                  >Image</span
+                ></label
+              >
+            </div>
+          </fieldset>
+          <fieldset id="background-color-controls">
+            <legend>Background colour</legend>
+            <div class="background-colors" role="group" aria-label="Background colour">
+              <button
+                type="button"
+                data-background-color=""
+                title="Theme default"
+                aria-label="Theme default"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#ffffff"
+                title="White"
+                aria-label="White"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#f8fafc"
+                title="Slate"
+                aria-label="Slate"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#fff7ed"
+                title="Orange mist"
+                aria-label="Orange mist"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#fefce8"
+                title="Yellow mist"
+                aria-label="Yellow mist"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#f0fdf4"
+                title="Green mist"
+                aria-label="Green mist"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#eff6ff"
+                title="Blue mist"
+                aria-label="Blue mist"
+              ></button>
+              <button
+                type="button"
+                data-background-color="#faf5ff"
+                title="Purple mist"
+                aria-label="Purple mist"
+              ></button>
+              <label class="custom-color" title="Custom colour"
+                ><input
+                  id="background-color"
+                  type="color"
+                  value="#f5f5f3"
+                  aria-label="Custom background colour"
+              /></label>
+            </div>
+          </fieldset>
+          <div class="field" id="pattern-controls">
+            <span>Pattern</span>
+            <div class="pattern-picker">
+              <button
+                id="pattern-picker-button"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+              ></button>
+              <div id="pattern-picker-list" role="listbox" tabindex="-1" hidden></div>
+            </div>
+            <select id="background-pattern" hidden aria-hidden="true" tabindex="-1">
+              <option value="grid">Square grid</option>
+              <option value="dots">Dot matrix</option>
+              <option value="horizontal">Horizontal lines</option>
+              <option value="vertical">Vertical lines</option>
+              <option value="diagonal">Diagonal lines</option>
+              <option value="crosshatch">Crosshatch</option>
+              <option value="waves">Waves</option>
+              <option value="cubes">Isometric cubes</option>
+              <option value="checkerboard">Checkerboard</option>
+              <option value="diamonds">Diamonds</option>
+              <option value="zigzag">Zigzag</option>
+              <option value="scales">Scales</option>
+              <option value="rings">Rings</option>
+              <option value="plus">Plus signs</option>
+              <option value="bricks">Brickwork</option>
+              <option value="hexagons">Hexagons</option>
+              <option value="blueprint">Blueprint</option>
+              <option value="tic-tac-toe">Tic-tac-toe</option>
+              <option value="overlapping-circles">Overlapping circles</option>
+              <option value="four-point-stars">Four-point stars</option>
+              <option value="falling-triangles">Falling triangles</option>
+            </select>
+          </div>
+          <div id="image-controls" hidden>
+            <div id="background-drop-zone" class="background-drop-zone" tabindex="0">
+              <strong>Drop, paste, or click</strong>
+              <span>PNG, JPEG, WebP, GIF, or SVG</span>
+            </div>
+          </div>
+          <input
+            id="background-file"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+            hidden
+          />
+        </section>
+        <section class="settings-group">
+          <h2>Data</h2>
+          <p class="hint">Stored on this device. Tessera never syncs or sends data.</p>
+          <h3>Groups and links</h3>
+          <div class="button-row">
+            <button class="secondary-button" id="import-items" type="button" data-icon="upload">
+              Import
+            </button>
+            <button class="secondary-button" id="export-items" type="button" data-icon="download">
+              Export
+            </button>
+          </div>
+          <h3>App settings</h3>
+          <div class="button-row">
+            <button class="secondary-button" id="import-settings" type="button" data-icon="upload">
+              Import
+            </button>
+            <button
+              class="secondary-button"
+              id="export-settings"
+              type="button"
+              data-icon="download"
+            >
+              Export
+            </button>
+          </div>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+          <button class="danger-button" id="clear-grid" type="button" data-icon="trash">
+            Clear entire grid
+          </button>
+        </section>
+      </div>
+    </aside>
+
+    <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">Tessera guide</p>
+          <h2 id="help-title">How everything fits together</h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-help"
+          type="button"
+          data-icon="x"
+          aria-label="Close help"
+        ></button>
+      </div>
+      <div class="help-content">
+        <section>
+          <h3>What is a group?</h3>
+          <p>
+            A group is a container for links and other groups. Use its flow setting to arrange its
+            immediate contents horizontally or vertically.
+          </p>
+        </section>
+        <section>
+          <h3>What is a link?</h3>
+          <p>
+            A link is a tile that opens a web address. It can use the site favicon, an emoji, or an
+            uploaded image.
+          </p>
+        </section>
+        <section>
+          <h3>How deeply can groups nest?</h3>
+          <p>
+            Groups can nest up to <span id="help-max-depth"></span> levels deep. Collapsing a group
+            from its chevron also collapses every group inside it.
+          </p>
+        </section>
+        <section>
+          <h3>How can I customise things?</h3>
+          <p>
+            Open a group or link to change its name, accent, size, layout, destination, and icon.
+            Page settings control themes, spacing, backgrounds, and the inspector.
+          </p>
+        </section>
+        <section>
+          <h3>Useful behavior</h3>
+          <p>
+            Drag items by their grip to rearrange them. Select mode operates recursively on groups.
+            Hold Shift while dragging the toolbar to snap it to an edge. Lock the layout when you
+            want links to open with one click.
+          </p>
+        </section>
+        <section>
+          <h3>Import and export</h3>
+          <p>
+            Groups and links can be backed up separately from app settings, so you can move a layout
+            without replacing your theme or apply settings without replacing your links.
+          </p>
+        </section>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="newtab.js"></script>
+  </body>
+</html>
