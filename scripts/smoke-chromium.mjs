@@ -170,10 +170,9 @@ try {
     for (let attempt = 0; attempt < 100 && !state?.ready; attempt += 1) {
       state = await evaluate(
         target.webSocketDebuggerUrl,
-        "({ id: globalThis.chrome?.runtime?.id, ready: document.documentElement.dataset.extensionReady === 'true' })",
+        "({ id: globalThis.chrome?.runtime?.id, ready: document.documentElement?.dataset.extensionReady === 'true' })",
       );
-      if (state?.id !== extension.id) break;
-      if (!state.ready) await wait(100);
+      if (state?.id !== extension.id || !state.ready) await wait(100);
     }
 
     if (state?.id !== extension.id || !state.ready) {
