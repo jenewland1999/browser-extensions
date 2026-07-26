@@ -13,9 +13,11 @@ const rules = await Promise.all(
 
 test("build emits loadable JavaScript without TypeScript source", async () => {
   const outputFiles = await readdir("dist", { recursive: true });
+  const contentScript = await readFile("dist/content.js", "utf8");
   assert.ok(outputFiles.includes("background.js"));
   assert.ok(outputFiles.includes("manifest.json"));
   assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
+  assert.doesNotMatch(contentScript, /\b(?:export|import)\b/);
 });
 
 test("uses exact hosts and only required Manifest V3 permissions", () => {
