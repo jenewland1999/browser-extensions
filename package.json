@@ -16,10 +16,10 @@
     "validate": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm normalize:archives && pnpm test:archives"
   },
   "devDependencies": {
-    "fflate": "0.8.2",
+    "fflate": "0.8.3",
     "oxfmt": "0.60.0",
     "oxlint": "1.75.0",
-    "turbo": "2.10.6"
+    "turbo": "2.10.7"
   },
   "engines": {
     "node": ">=24"
