@@ -113,7 +113,7 @@ const arguments_ = [
   `--load-extension=${extensionPaths}`,
 ];
 
-if (process.platform === "linux" && process.getuid?.() === 0) arguments_.push("--no-sandbox");
+if (process.platform === "linux") arguments_.push("--no-sandbox");
 arguments_.push("about:blank");
 
 const browser = spawn(executable, arguments_, { stdio: ["ignore", "ignore", "pipe"] });
