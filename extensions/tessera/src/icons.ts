@@ -12,6 +12,9 @@ const paths: Record<string, string> = {
   minimize:
     '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M16 3v3a2 2 0 0 0 2 2h3"/><path d="M8 21v-3a2 2 0 0 0-2-2H3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  bug: '<path d="m8 2 1.88 1.88M14.12 3.88 16 2M9 7.13v-1a3 3 0 0 1 6 0v1"/><path d="M5 13H2M22 13h-3M20 16.5 17.5 14M4 16.5 6.5 14"/><rect width="12" height="12" x="6" y="7" rx="5"/><path d="M12 7v12"/>',
+  "circle-help":
+    '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 5.83 1c-.39 1.28-1.93 1.73-2.55 2.75-.25.41-.38.81-.38 1.25"/><path d="M12 17h.01"/>',
   download:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
   "external-link":
@@ -26,7 +29,9 @@ const paths: Record<string, string> = {
   "rows-2": '<path d="M3 8h18"/><path d="M3 16h18"/>',
   "rows-3": '<path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h18"/>',
   "rows-4": '<path d="M3 4h18"/><path d="M3 9.3h18"/><path d="M3 14.7h18"/><path d="M3 20h18"/>',
+  "rotate-ccw": '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/>',
   columns: '<path d="M6 3v18"/><path d="M12 3v18"/><path d="M18 3v18"/>',
+  contrast: '<circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20Z"/>',
   "panel-left": '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
   "panel-right": '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',
   grid: '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/>',

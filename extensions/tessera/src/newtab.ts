@@ -47,7 +47,6 @@ function requireElement<T extends Element>(selector: string): T {
 
 const canvas = requireElement<HTMLElement>("#canvas");
 const toolbar = requireElement<HTMLElement>("#toolbar");
-const toolbarOrb = requireElement<HTMLButtonElement>("#toolbar-orb");
 const panel = requireElement<HTMLElement>("#panel");
 const editor = requireElement<HTMLElement>("#editor");
 const pageSettings = requireElement<HTMLElement>("#page-settings");
@@ -81,8 +80,8 @@ const backgroundDropZone = requireElement<HTMLElement>("#background-drop-zone");
 const backgroundColorControls = requireElement<HTMLElement>("#background-color-controls");
 const backgroundColorInput = requireElement<HTMLInputElement>("#background-color");
 const selectButton = requireElement<HTMLButtonElement>("#select-items");
-const expandAllButton = requireElement<HTMLButtonElement>("#expand-all");
-const collapseAllButton = requireElement<HTMLButtonElement>("#collapse-all");
+const expandAllMenuButton = requireElement<HTMLButtonElement>("#expand-all-menu");
+const collapseAllMenuButton = requireElement<HTMLButtonElement>("#collapse-all-menu");
 const deleteSelectedButton = requireElement<HTMLButtonElement>("#delete-selected");
 const selectionCount = requireElement<HTMLElement>("#selection-count");
 const moreMenuButton = requireElement<HTMLButtonElement>("#more-menu-button");
@@ -93,8 +92,16 @@ const helpMaxDepth = requireElement<HTMLElement>("#help-max-depth");
 let data: StartPageData = structuredClone(DEFAULT_DATA);
 let selectedId: string | undefined;
 let toastTimer = 0;
-let toolbarPosition: { x: number; y: number } | undefined;
-let toolbarMinimized = false;
+interface ToolbarPosition {
+  x: number;
+  y: number;
+}
+
+interface StoredToolbarPosition extends ToolbarPosition {
+  reference?: "center";
+}
+
+let toolbarPosition: ToolbarPosition | undefined;
 let toolbarAnchor: string | undefined;
 let lastSectionId: string | undefined;
 let selectionMode = false;
@@ -706,18 +713,16 @@ function renderLink(node: LinkNode): HTMLElement {
   });
   const actions = document.createElement("div");
   actions.className = "tile-actions";
-  actions.innerHTML = data.locked
-    ? `<button class="node-action" type="button">${icon("settings", 14)}</button>`
-    : `<button class="node-action" type="button">${icon("external-link", 14)}</button><button class="drag-handle" type="button">${icon("grip", 14)}</button>`;
+  actions.hidden = data.locked;
+  actions.innerHTML = `<button class="node-action" type="button">${icon("external-link", 14)}</button><button class="drag-handle" type="button">${icon("grip", 14)}</button>`;
   actions
     .querySelector<HTMLButtonElement>(".node-action")
-    ?.setAttribute("aria-label", `${data.locked ? "Edit" : "Open"} ${node.name}`);
+    ?.setAttribute("aria-label", `Open ${node.name}`);
   actions
     .querySelector<HTMLButtonElement>(".drag-handle")
     ?.setAttribute("aria-label", `Drag ${node.name}`);
   actions.querySelector<HTMLButtonElement>(".node-action")?.addEventListener("click", () => {
-    if (data.locked) openPanel(node.id);
-    else openLink(node.url, node.openMode);
+    openLink(node.url, node.openMode);
   });
   wrapper.append(actions);
   wrapper.append(linkCheckbox, link);
@@ -804,7 +809,7 @@ function setSelectionMode(enabled: boolean): void {
       y: toolbarCenter.y - toolbar.offsetHeight / 2,
     };
     positionFloatingElement(toolbar, toolbarPosition);
-    void chrome.storage.local.set({ toolbarPosition });
+    persistToolbarPosition();
   });
 }
 
@@ -816,14 +821,14 @@ function render(skipEditor = false): void {
   document.body.classList.toggle("returning-empty-mode", empty && onboardingComplete);
   panel.hidden = firstRun;
   canvas.classList.toggle("locked", data.locked);
+  toolbar.classList.toggle("locked", data.locked);
   lockButton.dataset["icon"] = data.locked ? "lock" : "unlock";
   lockButton.title = data.locked ? "Unlock layout" : "Lock layout";
   lockButton.setAttribute("aria-label", lockButton.title);
   lockButton.innerHTML = icon(data.locked ? "lock" : "unlock");
   if (empty) {
     if (onboardingComplete) {
-      toolbar.hidden = toolbarMinimized;
-      toolbarOrb.hidden = !toolbarMinimized;
+      toolbar.hidden = false;
       const emptyState = document.createElement("section");
       emptyState.className = "empty-canvas";
       emptyState.innerHTML = `
@@ -845,7 +850,6 @@ function render(skipEditor = false): void {
       return;
     }
     toolbar.hidden = true;
-    toolbarOrb.hidden = true;
     const welcome = document.createElement("section");
     welcome.className = "welcome first-run";
     welcome.innerHTML = `
@@ -893,11 +897,11 @@ function render(skipEditor = false): void {
     renderGuide(welcome);
     canvas.append(welcome);
   } else {
-    toolbar.hidden = toolbarMinimized;
-    toolbarOrb.hidden = !toolbarMinimized;
+    toolbar.hidden = false;
     for (const section of data.sections) canvas.append(renderNode(section, 1));
   }
   if (!skipEditor) renderEditor();
+  repositionAnchoredToolbar();
 }
 
 const GUIDE_STEPS = [
@@ -1632,7 +1636,7 @@ async function readImage(file: File, maxDataUrlLength: number): Promise<string> 
   return normalized;
 }
 
-function positionFloatingElement(element: HTMLElement, position: { x: number; y: number }): void {
+function positionFloatingElement(element: HTMLElement, position: ToolbarPosition): void {
   const x = Math.min(window.innerWidth - element.offsetWidth - 8, Math.max(8, position.x));
   const y = Math.min(window.innerHeight - element.offsetHeight - 8, Math.max(8, position.y));
   element.style.left = `${x}px`;
@@ -1641,19 +1645,45 @@ function positionFloatingElement(element: HTMLElement, position: { x: number; y:
   element.style.transform = "none";
 }
 
-function setToolbarMinimized(minimized: boolean): void {
-  const current = minimized ? toolbar : toolbarOrb;
-  const rect = current.getBoundingClientRect();
-  const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-  toolbarMinimized = minimized;
-  toolbar.hidden = minimized;
-  toolbarOrb.hidden = !minimized;
-  const target = minimized ? toolbarOrb : toolbar;
-  toolbarPosition = toolbarAnchor
-    ? anchorPosition(target, toolbarAnchor)
-    : { x: center.x - target.offsetWidth / 2, y: center.y - target.offsetHeight / 2 };
-  positionFloatingElement(target, toolbarPosition);
-  void chrome.storage.local.set({ toolbarMinimized, toolbarPosition, toolbarAnchor });
+function positionToolbarAtCenter(center: ToolbarPosition): void {
+  toolbarPosition = {
+    x: center.x - toolbar.offsetWidth / 2,
+    y: center.y - toolbar.offsetHeight / 2,
+  };
+  positionFloatingElement(toolbar, toolbarPosition);
+}
+
+function animateToolbarEntrance(): void {
+  if (toolbar.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const rect = toolbar.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const offset = 48;
+  const x =
+    centerX < window.innerWidth / 3 ? -offset : centerX > (window.innerWidth * 2) / 3 ? offset : 0;
+  const y =
+    centerY < window.innerHeight / 3
+      ? -offset
+      : centerY > (window.innerHeight * 2) / 3
+        ? offset
+        : 0;
+  toolbar.style.setProperty("--toolbar-enter-x", `${x}px`);
+  toolbar.style.setProperty("--toolbar-enter-y", `${y}px`);
+  toolbar.classList.add("entering");
+  toolbar.addEventListener("animationend", () => toolbar.classList.remove("entering"), {
+    once: true,
+  });
+}
+
+function persistToolbarPosition(): void {
+  if (!toolbarPosition) return;
+  const rect = toolbar.getBoundingClientRect();
+  const position: StoredToolbarPosition = {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    reference: "center",
+  };
+  void chrome.storage.local.set({ toolbarPosition: position, toolbarAnchor });
 }
 
 function enableToolbarDrag(): void {
@@ -1679,7 +1709,7 @@ function enableToolbarDrag(): void {
       toolbar.removeEventListener("pointermove", move);
       toolbar.removeEventListener("pointerup", stop);
       toolbar.removeEventListener("pointercancel", stop);
-      if (toolbarPosition) void chrome.storage.local.set({ toolbarPosition, toolbarAnchor });
+      persistToolbarPosition();
     };
     toolbar.addEventListener("pointermove", move);
     toolbar.addEventListener("pointerup", stop);
@@ -1731,34 +1761,8 @@ function anchorPosition(element: HTMLElement, name: string): { x: number; y: num
 function repositionAnchoredToolbar(): void {
   if (!toolbarAnchor) return;
   window.requestAnimationFrame(() => {
-    const target = toolbarMinimized ? toolbarOrb : toolbar;
-    toolbarPosition = anchorPosition(target, toolbarAnchor!);
-    positionFloatingElement(target, toolbarPosition);
-  });
-}
-
-function enableOrbDrag(): void {
-  toolbarOrb.addEventListener("pointerdown", (event) => {
-    const rect = toolbarOrb.getBoundingClientRect();
-    const start = { x: event.clientX, y: event.clientY };
-    const offset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    let moved = false;
-    toolbarOrb.setPointerCapture(event.pointerId);
-    const move = (moveEvent: PointerEvent): void => {
-      moved ||= Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) > 4;
-      toolbarPosition = { x: moveEvent.clientX - offset.x, y: moveEvent.clientY - offset.y };
-      if (moveEvent.shiftKey) toolbarPosition = snapPosition(toolbarOrb, toolbarPosition);
-      else toolbarAnchor = undefined;
-      positionFloatingElement(toolbarOrb, toolbarPosition);
-    };
-    const stop = (): void => {
-      toolbarOrb.removeEventListener("pointermove", move);
-      toolbarOrb.removeEventListener("pointerup", stop);
-      if (toolbarPosition) void chrome.storage.local.set({ toolbarPosition, toolbarAnchor });
-      if (!moved) setToolbarMinimized(false);
-    };
-    toolbarOrb.addEventListener("pointermove", move);
-    toolbarOrb.addEventListener("pointerup", stop);
+    toolbarPosition = anchorPosition(toolbar, toolbarAnchor!);
+    positionFloatingElement(toolbar, toolbarPosition);
   });
 }
 
@@ -1810,7 +1814,31 @@ function closeMoreMenu(): void {
 
 function placeMoreMenu(): void {
   if (moreMenu.hidden) return;
-  placeListbox(moreMenuButton, moreMenu, 320, 190, 10);
+  const toolbarRect = toolbar.getBoundingClientRect();
+  const moreMenuButtonRect = moreMenuButton.getBoundingClientRect();
+  const width = moreMenu.offsetWidth;
+  const gap = 14;
+  const maximumHeight = 480;
+  const below = window.innerHeight - toolbarRect.bottom - gap - 8;
+  const above = toolbarRect.top - gap - 8;
+  const preferredHeight = Math.min(maximumHeight, moreMenu.scrollHeight);
+  const openBelow = below >= preferredHeight || below >= above;
+  const available = Math.max(40, Math.min(maximumHeight, openBelow ? below : above));
+  const requestedLeft = toolbar.classList.contains("locked")
+    ? toolbarRect.left + (toolbarRect.width - width) / 2
+    : moreMenuButtonRect.right - width;
+  const left = Math.min(window.innerWidth - width - 8, Math.max(8, requestedLeft));
+  moreMenu.style.position = "fixed";
+  moreMenu.style.maxHeight = `${available}px`;
+  moreMenu.style.left = `${left}px`;
+  moreMenu.style.right = "auto";
+  if (openBelow) {
+    moreMenu.style.top = `${toolbarRect.bottom + gap}px`;
+    moreMenu.style.bottom = "auto";
+  } else {
+    moreMenu.style.top = "auto";
+    moreMenu.style.bottom = `${window.innerHeight - toolbarRect.top + gap}px`;
+  }
 }
 
 function linksIn(nodes: Node[]): LinkNode[] {
@@ -1919,7 +1947,6 @@ async function resetExtension(): Promise<void> {
   guideStep = -1;
   welcomeChoicesOpen = false;
   toolbarActivationBlockedUntil = performance.now() + 300;
-  toolbarMinimized = false;
   toolbarPosition = undefined;
   toolbarAnchor = undefined;
   emojiSkinTone = "";
@@ -1935,8 +1962,14 @@ async function resetExtension(): Promise<void> {
 requireElement<HTMLButtonElement>("#add-section").addEventListener("click", () => addSection());
 requireElement<HTMLButtonElement>("#add-link").addEventListener("click", () => addLink());
 selectButton.addEventListener("click", () => setSelectionMode(!selectionMode));
-expandAllButton.addEventListener("click", () => setAllSectionsCollapsed(false));
-collapseAllButton.addEventListener("click", () => setAllSectionsCollapsed(true));
+expandAllMenuButton.addEventListener("click", () => {
+  closeMoreMenu();
+  setAllSectionsCollapsed(false);
+});
+collapseAllMenuButton.addEventListener("click", () => {
+  closeMoreMenu();
+  setAllSectionsCollapsed(true);
+});
 requireElement<HTMLButtonElement>("#cancel-selection").addEventListener("click", () =>
   setSelectionMode(false),
 );
@@ -1957,9 +1990,17 @@ settingsButton.addEventListener("click", () => {
   else openPanel();
 });
 lockButton.addEventListener("click", () => {
+  const rect = toolbar.getBoundingClientRect();
+  const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  if (!data.locked && selectionMode) setSelectionMode(false);
   data.locked = !data.locked;
   selectedId = undefined;
   closePanel();
+  if (toolbarAnchor) repositionAnchoredToolbar();
+  else if (toolbarPosition) {
+    positionToolbarAtCenter(center);
+    persistToolbarPosition();
+  }
   void persistAndRender();
 });
 requireElement<HTMLButtonElement>("#import-items").addEventListener("click", () => {
@@ -1976,12 +2017,9 @@ requireElement<HTMLButtonElement>("#export-items").addEventListener("click", () 
 requireElement<HTMLButtonElement>("#export-settings").addEventListener("click", () =>
   exportJson("settings"),
 );
-requireElement<HTMLButtonElement>("#minimize-toolbar").addEventListener("click", () =>
-  setToolbarMinimized(true),
-);
 requireElement<HTMLButtonElement>("#hide-toolbar").addEventListener("click", () => {
+  closeMoreMenu();
   toolbar.hidden = true;
-  toolbarOrb.hidden = true;
   showToast("Toolbar hidden until next new tab.");
 });
 importInput.addEventListener("change", async () => {
@@ -2283,11 +2321,10 @@ async function initialize(): Promise<void> {
   setIcons();
   enhanceSelects();
   enableToolbarDrag();
-  enableOrbDrag();
+  toolbar.classList.add("initializing");
   const stored = await chrome.storage.local.get([
     STORAGE_KEY,
     "toolbarPosition",
-    "toolbarMinimized",
     "toolbarAnchor",
     "emojiSkinTone",
     "emojiRecent",
@@ -2296,11 +2333,13 @@ async function initialize(): Promise<void> {
   const value = stored[STORAGE_KEY];
   void chrome.storage.local.remove("panelPosition");
   const savedToolbarPosition = stored["toolbarPosition"] as
-    | { x?: unknown; y?: unknown }
+    | { x?: unknown; y?: unknown; reference?: unknown }
     | undefined;
+  let savedToolbarCenter: ToolbarPosition | undefined;
   if (typeof savedToolbarPosition?.x === "number" && typeof savedToolbarPosition.y === "number") {
-    toolbarPosition = { x: savedToolbarPosition.x, y: savedToolbarPosition.y };
-    positionFloatingElement(toolbar, toolbarPosition);
+    if (savedToolbarPosition.reference === "center")
+      savedToolbarCenter = { x: savedToolbarPosition.x, y: savedToolbarPosition.y };
+    else toolbarPosition = { x: savedToolbarPosition.x, y: savedToolbarPosition.y };
   }
   toolbarAnchor = typeof stored["toolbarAnchor"] === "string" ? stored["toolbarAnchor"] : undefined;
   emojiSkinTone = SKIN_TONES.includes(String(stored["emojiSkinTone"] ?? ""))
@@ -2311,11 +2350,7 @@ async function initialize(): Promise<void> {
         .filter((emoji): emoji is string => typeof emoji === "string")
         .slice(0, 24)
     : [];
-  toolbarMinimized = stored["toolbarMinimized"] === true;
-  toolbar.hidden = toolbarMinimized;
-  toolbarOrb.hidden = !toolbarMinimized;
-  if (toolbarPosition)
-    positionFloatingElement(toolbarMinimized ? toolbarOrb : toolbar, toolbarPosition);
+  toolbar.hidden = false;
   if (value !== undefined) {
     try {
       const storedDataValue = storedData(value);
@@ -2338,6 +2373,23 @@ async function initialize(): Promise<void> {
   }
   applyAppearance();
   render();
+  if (toolbarAnchor) repositionAnchoredToolbar();
+  else if (savedToolbarCenter) {
+    positionToolbarAtCenter(savedToolbarCenter);
+    persistToolbarPosition();
+  } else if (toolbarPosition) {
+    positionFloatingElement(toolbar, toolbarPosition);
+    persistToolbarPosition();
+  } else {
+    positionFloatingElement(toolbar, {
+      x: (window.innerWidth - toolbar.offsetWidth) / 2,
+      y: 16,
+    });
+  }
+  window.requestAnimationFrame(() => {
+    toolbar.classList.remove("initializing");
+    animateToolbarEntrance();
+  });
   document.documentElement.dataset["extensionReady"] = "true";
 }
 

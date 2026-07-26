@@ -48,24 +48,6 @@
       >
         <span>Edit</span>
       </button>
-      <button
-        class="tool standard-tool"
-        id="expand-all"
-        type="button"
-        data-icon="maximize"
-        title="Expand all sections"
-      >
-        <span>Expand all</span>
-      </button>
-      <button
-        class="tool standard-tool"
-        id="collapse-all"
-        type="button"
-        data-icon="minimize"
-        title="Collapse all sections"
-      >
-        <span>Collapse all</span>
-      </button>
       <div class="toolbar-divider action-divider"></div>
       <button class="tool selection-tool" id="cancel-selection" type="button" data-icon="x" hidden>
         <span>Cancel</span>
@@ -100,22 +82,6 @@
       ></button>
       <button
         class="icon-button"
-        id="minimize-toolbar"
-        type="button"
-        data-icon="minus"
-        title="Minimize toolbar"
-        aria-label="Minimize toolbar"
-      ></button>
-      <button
-        class="icon-button"
-        id="hide-toolbar"
-        type="button"
-        data-icon="eye-off"
-        title="Hide toolbar until next new tab"
-        aria-label="Hide toolbar until next new tab"
-      ></button>
-      <button
-        class="icon-button"
         id="more-menu-button"
         type="button"
         data-icon="more-horizontal"
@@ -125,46 +91,56 @@
         aria-expanded="false"
       ></button>
       <div id="more-menu" class="more-menu" role="menu" hidden>
+        <button id="fix-favicon-contrast" type="button" role="menuitem" data-icon="contrast">
+          <span>Boost favicon contrast</span>
+        </button>
+        <button id="hide-toolbar" type="button" role="menuitem" data-icon="eye-off">
+          <span>Hide for this session</span>
+        </button>
+        <hr />
+        <button id="expand-all-menu" type="button" role="menuitem" data-icon="chevrons-down">
+          <span>Expand all sections</span>
+        </button>
+        <button id="collapse-all-menu" type="button" role="menuitem" data-icon="chevrons-up">
+          <span>Collapse all sections</span>
+        </button>
+        <hr />
         <a
           role="menuitem"
           href="https://github.com/jenewland1999/browser-extensions"
           target="_blank"
-          >Repository</a
+          data-icon="external-link"
+          ><span>Repository</span></a
         >
         <a
           role="menuitem"
           href="https://github.com/jenewland1999/browser-extensions/issues/new?template=bug_report.md"
           target="_blank"
-          >Report a bug</a
+          data-icon="bug"
+          ><span>Report a bug</span></a
         >
         <a
           role="menuitem"
           href="https://github.com/jenewland1999/browser-extensions/issues/new?template=feature_request.md"
           target="_blank"
-          >Request a feature</a
+          data-icon="sparkles"
+          ><span>Request a feature</span></a
         >
-        <button id="open-help" type="button" role="menuitem">Help</button>
-        <button id="fix-favicon-contrast" type="button" role="menuitem">
-          Fix favicon contrast
+        <button id="open-help" type="button" role="menuitem" data-icon="circle-help">
+          <span>Help</span>
         </button>
         <hr />
-        <button id="reset-extension" class="menu-danger" type="button" role="menuitem">
-          Reset extension
+        <button
+          id="reset-extension"
+          class="menu-danger"
+          type="button"
+          role="menuitem"
+          data-icon="rotate-ccw"
+        >
+          <span>Reset extension</span>
         </button>
       </div>
     </header>
-
-    <button
-      id="toolbar-orb"
-      class="toolbar-orb"
-      type="button"
-      title="Expand Tessera toolbar"
-      aria-label="Expand Tessera toolbar"
-      hidden
-    >
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span class="orb-name">Tessera</span>
-    </button>
 
     <main id="canvas" class="canvas" aria-label="Start page sections"></main>
 

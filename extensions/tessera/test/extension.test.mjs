@@ -55,13 +55,11 @@ test("bundles full categorized Unicode emoji data", async () => {
   assert.ok(groups.some((group) => group.emojis.some(([emoji]) => emoji === "🫶")));
 });
 
-test("new tab exposes toolbar visibility controls", async () => {
+test("new tab exposes locked toolbar and overflow controls", async () => {
   const html = await readFile("dist/newtab.html", "utf8");
-  assert.match(html, /id="minimize-toolbar"/);
-  assert.match(html, /id="hide-toolbar"/);
-  assert.match(html, /id="toolbar-orb"/);
-  assert.match(html, /id="expand-all"/);
-  assert.match(html, /id="collapse-all"/);
+  assert.match(html, /id="hide-toolbar" type="button" role="menuitem" data-icon="eye-off"/);
+  assert.match(html, /id="expand-all-menu"/);
+  assert.match(html, /id="collapse-all-menu"/);
   assert.match(html, /id="more-menu-button"/);
   assert.match(html, /id="help-dialog"/);
   assert.match(html, /id="reset-extension"/);
@@ -393,18 +391,27 @@ test("collapsed sections do not retain an empty content area", async () => {
 });
 
 test("overflow menu provides help, project links, and reset", async () => {
-  const [html, script] = await Promise.all([
+  const [html, script, css] = await Promise.all([
     readFile("dist/newtab.html", "utf8"),
     readFile("dist/newtab.js", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
   ]);
   assert.match(html, /Repository/);
   assert.match(html, /Report a bug/);
   assert.match(html, /Request a feature/);
+  assert.match(html, /data-icon="chevrons-down"/);
+  assert.match(html, /id="fix-favicon-contrast"[^>]+data-icon="contrast"/);
+  assert.match(html, /Boost favicon contrast/);
+  assert.match(html, /data-icon="rotate-ccw"/);
   assert.match(html, /What is a group\?/);
   assert.match(script, /chrome\.storage\.local\.clear\(\)/);
   assert.match(script, /Reset Tessera\?/);
   assert.match(script, /document\.body\.append\(moreMenu\)/);
-  assert.match(script, /placeListbox\(moreMenuButton, moreMenu, 320, 190, 10\)/);
+  assert.match(script, /moreMenuButton\.getBoundingClientRect/);
+  assert.match(script, /toolbar\.classList\.contains\("locked"\)/);
+  assert.match(script, /const maximumHeight = 480/);
+  assert.match(script, /const gap = 14/);
+  assert.match(css, /\.more-menu \{[\s\S]+overflow-y: auto/);
   assert.match(html, /id="fix-favicon-contrast"/);
   assert.match(script, /faviconNeedsBackground/);
   assert.match(script, /createImageBitmap/);
@@ -493,11 +500,23 @@ test("enhances native selects and exposes background colors", async () => {
   assert.match(script, /--page-background/);
 });
 
-test("minimized toolbar keeps logo and name", async () => {
-  const html = await readFile("dist/newtab.html", "utf8");
-  assert.doesNotMatch(html, /class="orb-grip"/);
-  assert.match(html, /class="brand-mark" aria-hidden="true"/);
-  assert.match(html, /class="orb-name">Tessera/);
+test("locked toolbar keeps its logo and overflow menu", async () => {
+  const [html, css] = await Promise.all([
+    readFile("dist/newtab.html", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
+  ]);
+  assert.match(html, /class="brand-mark"/);
+  assert.match(html, /id="more-menu-button"/);
+  assert.match(css, /\.toolbar\.locked #settings/);
+  assert.match(css, /\.toolbar\.locked #lock \{[\s\S]+order: 1/);
+  assert.match(css, /\.toolbar\.locked \.brand \{[\s\S]+order: 2/);
+  assert.match(css, /\.toolbar\.locked #more-menu-button \{[\s\S]+order: 3/);
+});
+
+test("locked mode hides link edit actions", async () => {
+  const script = await readFile("dist/newtab.js", "utf8");
+  assert.match(script, /actions\.hidden = data\.locked/);
+  assert.doesNotMatch(script, /data\.locked \? "Edit" : "Open"/);
 });
 
 test("anchored toolbar centers within docked canvas", async () => {
@@ -513,6 +532,9 @@ test("edit mode preserves the toolbar centre", async () => {
   assert.match(script, /const toolbarCenter =/);
   assert.match(script, /toolbarCenter\.x - toolbar\.offsetWidth \/ 2/);
   assert.match(script, /toolbarCenter\.y - toolbar\.offsetHeight \/ 2/);
+  assert.match(script, /function positionToolbarAtCenter/);
+  assert.match(script, /reference: "center"/);
+  assert.match(script, /if \(toolbarAnchor\) \{[\s\S]+repositionAnchoredToolbar\(\)/);
 });
 
 test("docked inspector animates toolbar and canvas shifts", async () => {
@@ -521,9 +543,25 @@ test("docked inspector animates toolbar and canvas shifts", async () => {
   assert.match(css, /\.canvas \{[\s\S]+margin-left 220ms/);
 });
 
+test("toolbar enters from its saved screen region", async () => {
+  const [script, css] = await Promise.all([
+    readFile("dist/newtab.js", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
+  ]);
+  assert.match(script, /function animateToolbarEntrance/);
+  assert.match(script, /centerX < window\.innerWidth \/ 3/);
+  assert.match(script, /centerY > \(window\.innerHeight \* 2\) \/ 3/);
+  assert.match(css, /\.toolbar\.initializing \{[\s\S]+transition: none/);
+  assert.match(css, /@keyframes toolbar-enter \{[\s\S]+--toolbar-enter-x/);
+});
+
 test("section counter follows actions at far right", async () => {
-  const script = await readFile("dist/newtab.js", "utf8");
+  const [script, css] = await Promise.all([
+    readFile("dist/newtab.js", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
+  ]);
   assert.match(script, /class="section-actions"[\s\S]+class="section-count"/);
+  assert.match(css, /\.locked \.section-count \{[\s\S]+margin-left: auto/);
 });
 
 test("composes emoji skin tones into valid sequences", () => {
@@ -547,7 +585,7 @@ test("returning empty state preserves toolbar and background", async () => {
     readFile("dist/newtab.css", "utf8"),
   ]);
   assert.match(script, /className = "empty-canvas"/);
-  assert.match(script, /toolbar\.hidden = toolbarMinimized/);
+  assert.match(script, /toolbar\.hidden = false/);
   assert.match(script, /welcome-mode", firstRun/);
   assert.match(css, /\.empty-canvas/);
 });
