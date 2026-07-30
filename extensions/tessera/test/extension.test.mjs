@@ -57,6 +57,7 @@ test("bundles full categorized Unicode emoji data", async () => {
 
 test("new tab exposes locked toolbar and overflow controls", async () => {
   const html = await readFile("dist/newtab.html", "utf8");
+  assert.match(html, /<title>New Tab - Tessera<\/title>/);
   assert.match(html, /id="hide-toolbar" type="button" role="menuitem" data-icon="eye-off"/);
   assert.match(html, /id="expand-all-menu"/);
   assert.match(html, /id="collapse-all-menu"/);
@@ -435,6 +436,12 @@ test("select controls provide contextual icons and clearer inspector labels", as
   assert.match(script, /"inspector-side"/);
   assert.match(script, /compact: "rows-4"/);
   assert.doesNotMatch(script, /option\.insertAdjacentHTML\("beforeend", icon\("grid"/);
+});
+
+test("docked inspector stays open when the canvas is clicked", async () => {
+  const script = await readFile("dist/newtab.js", "utf8");
+  assert.match(script, /document\.body\.classList\.contains\("inspector-docked"\)/);
+  assert.match(script, /event\.key !== "Escape"/);
 });
 
 test("favicon and emoji controls have spacious aligned layouts", async () => {

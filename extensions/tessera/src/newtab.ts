@@ -1982,7 +1982,8 @@ deleteSelectedButton.addEventListener("click", () => {
 });
 requireElement<HTMLButtonElement>("#close-panel").addEventListener("click", closePanel);
 canvas.addEventListener("click", (event) => {
-  if (!panel.classList.contains("open")) return;
+  if (!panel.classList.contains("open") || document.body.classList.contains("inspector-docked"))
+    return;
   if (!(event.target as Element).closest(".section, .link-wrap")) closePanel();
 });
 settingsButton.addEventListener("click", () => {
