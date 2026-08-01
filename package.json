@@ -17,8 +17,8 @@
   },
   "devDependencies": {
     "fflate": "0.8.3",
-    "oxfmt": "0.60.0",
-    "oxlint": "1.75.0",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
     "turbo": "2.10.7"
   },
   "engines": {
