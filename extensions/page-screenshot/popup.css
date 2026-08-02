@@ -18,13 +18,29 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  height: 580px;
+  min-height: 580px;
+  max-height: 580px;
+  overflow: hidden;
+}
+
 [hidden] {
   display: none !important;
 }
 
 body {
   width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  height: 580px;
+  min-height: 0;
+  max-height: 580px;
   margin: 0;
+  overflow-y: auto;
   background: linear-gradient(115deg, transparent 68%, rgb(255 204 77 / 5%) 68%), #0c0d0f;
 }
 

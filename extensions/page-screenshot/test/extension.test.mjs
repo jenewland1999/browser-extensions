@@ -30,6 +30,18 @@ test("build emits loadable extension files", async () => {
   assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
 });
 
+test("keeps the popup inside Chrome's action surface", async () => {
+  const popupCss = await readFile("dist/popup.css", "utf8");
+  const htmlLayout = popupCss.match(/html \{[\s\S]*?\n\}/)?.[0] ?? "";
+  const bodyLayout = popupCss.match(/body \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(htmlLayout, /width: 360px/);
+  assert.match(htmlLayout, /height: 580px/);
+  assert.match(htmlLayout, /overflow: hidden/);
+  assert.match(bodyLayout, /width: 360px/);
+  assert.match(bodyLayout, /height: 580px/);
+  assert.match(bodyLayout, /overflow-y: auto/);
+});
+
 test("hides bottom overlays before the first scroll", async () => {
   const background = await readFile("dist/background.js", "utf8");
   const initialHide = background.indexOf('setViewportElementsForCapture, ["first"]');

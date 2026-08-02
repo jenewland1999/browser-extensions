@@ -23,6 +23,8 @@ Lightweight Manifest V3 Chrome extension for timestamped viewport and full-page 
 
 Screenshots save automatically to `Downloads`. Enable **Choose each time** to select another location for each capture. Chrome does not allow extensions to silently save outside the browser's Downloads directory.
 
+The popup keeps its compact toolbar size and scrolls its settings area internally when the controls exceed the browser's popup height limit.
+
 Choose PNG, JPEG, or WebP in the popup. JPEG and WebP support adjustable quality.
 
 Customize filenames with these tokens:
