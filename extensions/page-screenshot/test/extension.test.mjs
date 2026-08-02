@@ -121,7 +121,7 @@ test("handles viewport elements on all edges and restores their styles", () => {
   });
   const bottom = createViewportElement({
     position: "fixed",
-    top: "auto",
+    top: "760px",
     bottom: "0px",
     left: "0px",
     right: "0px",
@@ -186,6 +186,7 @@ test("handles viewport elements on all edges and restores their styles", () => {
     assert.equal(top.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(bottom.getAttribute("style"), "background: black");
     assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
 

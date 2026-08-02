@@ -43,8 +43,7 @@ export function setViewportElementsForCapture(phase: ViewportCapturePhase): void
       rect.top <= edgeTolerance &&
       rect.bottom >= viewportHeight - edgeTolerance;
 
-    if (bottom && !top) return "bottom";
-    if (top && !bottom) return "top";
+    if (bottom && !fillsViewportHeight) return "bottom";
     if ((left || right) && fillsViewportHeight) return "side";
     if (top) return "top";
     if (bottom) return "bottom";
