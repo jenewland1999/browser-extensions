@@ -48,7 +48,7 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  extensions/servicenow-advanced-service:
+  extensions/servicenow-advanced-service-view:
     devDependencies:
       typescript:
         specifier: 7.0.2

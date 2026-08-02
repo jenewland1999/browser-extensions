@@ -85,8 +85,8 @@ export const archives = [
     ],
   },
   {
-    extension: "servicenow-advanced-service",
-    archive: "servicenow-advanced-service.zip",
+    extension: "servicenow-advanced-service-view",
+    archive: "servicenow-advanced-service-view.zip",
     files: [
       "manifest.json",
       "history.js",

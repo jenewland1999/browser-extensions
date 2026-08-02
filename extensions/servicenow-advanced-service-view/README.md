@@ -1,4 +1,4 @@
-# ServiceNow Advanced Application Service
+# ServiceNow Advanced Service View
 
 Small Manifest V3 extension that redirects the ServiceNow application-service
 wrapper route to the advanced `cmdb_ci_service_auto.do` view for the same
@@ -13,11 +13,11 @@ inject remote code, or send telemetry.
 
 ## Install unpacked
 
-1. Run `pnpm --filter @browser-extensions/servicenow-advanced-service build`
+1. Run `pnpm --filter @browser-extensions/servicenow-advanced-service-view build`
    from the repository root.
 2. Open `chrome://extensions` and enable **Developer mode**.
 3. Select **Load unpacked**.
-4. Choose `extensions/servicenow-advanced-service/dist`.
+4. Choose `extensions/servicenow-advanced-service-view/dist`.
 5. Open a simple application-service URL and confirm it lands on the advanced
    `cmdb_ci_service_auto.do` URL.
 

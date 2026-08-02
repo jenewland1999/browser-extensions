@@ -24,7 +24,7 @@ for (const path of staticPaths) {
   cpSync(path, resolve(outputDirectory, path), { recursive: true });
 }
 
-execFileSync("zip", ["-X", "servicenow-advanced-service.zip", ...archiveFiles], {
+execFileSync("zip", ["-X", "servicenow-advanced-service-view.zip", ...archiveFiles], {
   cwd: outputDirectory,
   stdio: "inherit",
 });

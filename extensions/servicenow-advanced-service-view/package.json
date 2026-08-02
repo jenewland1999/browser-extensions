@@ -1,5 +1,5 @@
 {
-  "name": "@browser-extensions/servicenow-advanced-service",
+  "name": "@browser-extensions/servicenow-advanced-service-view",
   "version": "1.0.0",
   "private": true,
   "description": "Redirect ServiceNow application services to the advanced view.",

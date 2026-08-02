@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "ServiceNow Advanced Application Service",
+  "name": "ServiceNow Advanced Service View",
   "description": "Open ServiceNow application services in the advanced view.",
   "version": "1.0.0",
   "icons": {

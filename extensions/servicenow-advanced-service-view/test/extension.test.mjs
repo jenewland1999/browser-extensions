@@ -54,6 +54,7 @@ test("build emits the manifest and classic content scripts", async () => {
 
 test("uses only the exact ServiceNow host and route", () => {
   assert.equal(manifest.manifest_version, 3);
+  assert.equal(manifest.name, "ServiceNow Advanced Service View");
   assert.deepEqual(manifest.icons, {
     16: "icons/icon-16.png",
     32: "icons/icon-32.png",
