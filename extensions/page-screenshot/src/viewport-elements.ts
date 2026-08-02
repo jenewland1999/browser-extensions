@@ -38,15 +38,11 @@ export function setViewportElementsForCapture(phase: ViewportCapturePhase): void
     const left = isInsetSet(computedStyle.left) || rect.left <= edgeTolerance;
     const right =
       isInsetSet(computedStyle.right) || rect.right >= window.innerWidth - edgeTolerance;
-    const fillsViewportHeight =
-      rect.height >= viewportHeight - edgeTolerance &&
-      rect.top <= edgeTolerance &&
-      rect.bottom >= viewportHeight - edgeTolerance;
+    const spansMostViewportHeight = rect.height >= viewportHeight * 0.75 && (top || bottom);
 
-    if (bottom && !fillsViewportHeight) return "bottom";
-    if ((left || right) && fillsViewportHeight) return "side";
-    if (top) return "top";
+    if ((left || right) && spansMostViewportHeight) return "side";
     if (bottom) return "bottom";
+    if (top) return "top";
     if (left || right) return "side";
     return "top";
   };

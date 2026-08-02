@@ -145,6 +145,14 @@ test("handles viewport elements on all edges and restores their styles", () => {
     right: "auto",
     rect: { top: 0, bottom: 800, left: 0, right: 240, height: 800 },
   });
+  const offsetLeftRail = createViewportElement({
+    position: "fixed",
+    top: "56px",
+    bottom: "0px",
+    left: "0px",
+    right: "1040px",
+    rect: { top: 56, bottom: 800, left: 0, right: 240, height: 744 },
+  });
   const right = createViewportElement({
     position: "sticky",
     top: "0px",
@@ -161,7 +169,7 @@ test("handles viewport elements on all edges and restores their styles", () => {
     right: "auto",
     rect: { top: 100, bottom: 200, left: 100, right: 200, height: 100 },
   });
-  const elements = [top, stickyTop, bottom, left, right, staticElement];
+  const elements = [top, stickyTop, bottom, left, offsetLeftRail, right, staticElement];
   const originalStyles = elements.map((element) => element.getAttribute("style"));
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
@@ -181,6 +189,7 @@ test("handles viewport elements on all edges and restores their styles", () => {
     assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), false);
     assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(left.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(offsetLeftRail.hasAttribute("data-page-screenshot-hidden"), false);
     assert.equal(right.hasAttribute("data-page-screenshot-hidden"), false);
     assert.equal(staticElement.hasAttribute("data-page-screenshot-hidden"), false);
 
@@ -189,6 +198,7 @@ test("handles viewport elements on all edges and restores their styles", () => {
     assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(offsetLeftRail.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
 
     setViewportElementsForCapture("last");
@@ -197,6 +207,7 @@ test("handles viewport elements on all edges and restores their styles", () => {
     assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), false);
     assert.equal(bottom.getAttribute("style"), "background: black");
     assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(offsetLeftRail.hasAttribute("data-page-screenshot-hidden"), true);
     assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
 
     restoreViewportElements();
