@@ -196,6 +196,11 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
     let scale = 1;
     let lastCaptureTime = 0;
 
+    if (tiles.length > 1) {
+      // Hide bottom-attached viewport elements before the initial scroll and capture pass.
+      await executeOnTab(tabId, setViewportElementsForCapture, ["first"] as never[]);
+    }
+
     for (const [index, tile] of tiles.entries()) {
       await executeOnTab(tabId, scrollPage, [tile.scrollX, tile.scrollY] as never[]);
       const phase = getCaptureTilePhase(index, tiles.length);

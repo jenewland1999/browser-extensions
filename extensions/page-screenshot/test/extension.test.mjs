@@ -28,6 +28,15 @@ test("build emits loadable extension files", async () => {
   assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
 });
 
+test("hides bottom overlays before the first scroll", async () => {
+  const background = await readFile("dist/background.js", "utf8");
+  const initialHide = background.indexOf('setViewportElementsForCapture, ["first"]');
+  const firstScroll = background.indexOf("scrollPage, [tile.scrollX, tile.scrollY]");
+  assert.ok(initialHide >= 0);
+  assert.ok(firstScroll >= 0);
+  assert.ok(initialHide < firstScroll);
+});
+
 test("uses only screenshot permissions", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.deepEqual(manifest.permissions, ["activeTab", "downloads", "scripting", "storage"]);
