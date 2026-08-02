@@ -181,6 +181,25 @@ export function createCaptureTiles(metrics: PageMetrics): CaptureTile[] {
 
   return tiles;
 }
+
+export type CaptureTilePhase = "single" | "first" | "middle" | "last";
+
+export function getCaptureTilePhase(index: number, tileCount: number): CaptureTilePhase {
+  if (
+    !Number.isSafeInteger(index) ||
+    !Number.isSafeInteger(tileCount) ||
+    tileCount <= 0 ||
+    index < 0 ||
+    index >= tileCount
+  ) {
+    throw new Error(`Invalid capture tile position: ${index} of ${tileCount}.`);
+  }
+  if (tileCount === 1) return "single";
+  if (index === 0) return "first";
+  if (index === tileCount - 1) return "last";
+  return "middle";
+}
+
 export interface PageMetrics {
   width: number;
   height: number;

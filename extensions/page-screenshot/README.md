@@ -5,7 +5,7 @@ Lightweight Manifest V3 Chrome extension for timestamped viewport and full-page 
 ## Features
 
 - Capture the visible viewport or stitch the full page in one downward pass.
-- Keep fixed and sticky overlays only at the top of full-page screenshots.
+- Handle fixed and sticky overlays by viewport edge during full-page captures.
 - Save as lossless PNG or adjustable-quality JPEG and WebP.
 - Save directly to `Downloads` or choose a location for each capture.
 - Customize filenames with domain, capture type, date, and time tokens.
@@ -42,4 +42,10 @@ Default shortcuts are `Command+Shift+1` / `Ctrl+Shift+1` for the viewport and `C
 
 ## Full-page capture
 
-Full-page capture scrolls down the page once, loading deferred content while stitching viewport captures. Fixed and sticky overlays are included only at the top of the screenshot.
+Full-page capture scrolls down the page once, loading deferred content while stitching viewport captures. Fixed and sticky overlays are handled by the edge they are attached to:
+
+- Top overlays are visible in the first tile and hidden from later tiles.
+- Bottom overlays are hidden from the first and intermediate tiles and visible in the final tile.
+- Left and right overlays are visible only in the first tile, so a fixed-height navigation or rail is not repeated throughout the stitched image.
+
+If a left or right overlay is intended to cover the entire document height, it is currently represented once at the top of the full-page screenshot rather than repeated in every tile.

@@ -5,6 +5,7 @@ import {
   createCaptureTiles,
   createFilename,
   defaultSettings,
+  getCaptureTilePhase,
   normalizeSettings,
   validateCanvasDimensions,
   validatePageMetrics,
@@ -12,6 +13,7 @@ import {
   type CaptureTabIdentity,
   type PageMetrics,
 } from "./capture.js";
+import { restoreViewportElements, setViewportElementsForCapture } from "./viewport-elements.js";
 
 type CaptureType = "viewport" | "full-page";
 interface CaptureResult {
@@ -122,31 +124,6 @@ async function scrollPage(x: number, y: number): Promise<void> {
   );
 }
 
-function hideViewportElements(): void {
-  for (const element of document.querySelectorAll<HTMLElement>("body *")) {
-    if (element.hasAttribute("data-page-screenshot-hidden")) continue;
-    const position = getComputedStyle(element).position;
-    if (position !== "fixed" && position !== "sticky") continue;
-    element.dataset["pageScreenshotStyle"] = element.getAttribute("style") ?? "";
-    element.dataset["pageScreenshotHadStyle"] = String(element.hasAttribute("style"));
-    element.dataset["pageScreenshotHidden"] = "";
-    element.style.setProperty("opacity", "0", "important");
-    element.style.setProperty("pointer-events", "none", "important");
-  }
-}
-
-function restoreViewportElements(): void {
-  for (const element of document.querySelectorAll<HTMLElement>("[data-page-screenshot-hidden]")) {
-    const style = element.dataset["pageScreenshotStyle"] ?? "";
-    const hadStyle = element.dataset["pageScreenshotHadStyle"] === "true";
-    delete element.dataset["pageScreenshotStyle"];
-    delete element.dataset["pageScreenshotHadStyle"];
-    delete element.dataset["pageScreenshotHidden"];
-    if (hadStyle) element.setAttribute("style", style);
-    else element.removeAttribute("style");
-  }
-}
-
 async function executeOnTab<T>(
   tabId: number,
   func: (...args: never[]) => T | Promise<T>,
@@ -221,7 +198,8 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
 
     for (const [index, tile] of tiles.entries()) {
       await executeOnTab(tabId, scrollPage, [tile.scrollX, tile.scrollY] as never[]);
-      if (index > 0) await executeOnTab(tabId, hideViewportElements);
+      const phase = getCaptureTilePhase(index, tiles.length);
+      await executeOnTab(tabId, setViewportElementsForCapture, [phase] as never[]);
       await wait(Math.max(0, 600 - (Date.now() - lastCaptureTime)));
       const dataUrl = await captureWithVerification(
         () => verifyCaptureTab(tab),

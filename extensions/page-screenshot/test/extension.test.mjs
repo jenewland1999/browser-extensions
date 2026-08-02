@@ -8,10 +8,15 @@ import {
   captureWithVerification,
   createCaptureTiles,
   createFilename,
+  getCaptureTilePhase,
   normalizeSettings,
   validateCanvasDimensions,
   validatePageMetrics,
 } from "../dist/capture.js";
+import {
+  restoreViewportElements,
+  setViewportElementsForCapture,
+} from "../dist/viewport-elements.js";
 
 const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 
@@ -19,6 +24,7 @@ test("build emits loadable extension files", async () => {
   const outputFiles = await readdir("dist", { recursive: true });
   assert.ok(outputFiles.includes("popup.js"));
   assert.ok(outputFiles.includes("manifest.json"));
+  assert.ok(outputFiles.includes("viewport-elements.js"));
   assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
 });
 
@@ -46,6 +52,157 @@ test("creates full-page tiles including partial edges", () => {
       { y: 1400, height: 100, scrollY: 800, sourceY: 600 },
     ],
   );
+});
+
+test("assigns the correct visibility phase to each capture tile", () => {
+  assert.equal(getCaptureTilePhase(0, 1), "single");
+  assert.equal(getCaptureTilePhase(0, 3), "first");
+  assert.equal(getCaptureTilePhase(1, 3), "middle");
+  assert.equal(getCaptureTilePhase(2, 3), "last");
+  assert.throws(() => getCaptureTilePhase(3, 3), /Invalid capture tile position/);
+});
+
+function createViewportElement({ position, top, bottom, left, right, rect, style = null }) {
+  let styleAttribute = style;
+  const attributes = new Set(style === null ? [] : ["style"]);
+  const dataset = Object.create(null);
+  const element = {
+    dataset,
+    computedStyle: { position, top, bottom, left, right },
+    style: {
+      setProperty(name, value, priority) {
+        styleAttribute = `${styleAttribute ?? ""}${styleAttribute ? "; " : ""}${name}: ${value}${priority ? ` !${priority}` : ""}`;
+        attributes.add("style");
+      },
+    },
+    getAttribute(name) {
+      return name === "style" ? styleAttribute : null;
+    },
+    setAttribute(name, value) {
+      if (name === "style") {
+        styleAttribute = value;
+        attributes.add("style");
+      }
+    },
+    removeAttribute(name) {
+      if (name === "style") {
+        styleAttribute = null;
+        attributes.delete("style");
+      }
+    },
+    hasAttribute(name) {
+      if (name === "data-page-screenshot-hidden") return dataset.pageScreenshotHidden !== undefined;
+      return attributes.has(name);
+    },
+    getBoundingClientRect() {
+      return rect;
+    },
+  };
+  return element;
+}
+
+test("handles viewport elements on all edges and restores their styles", () => {
+  const top = createViewportElement({
+    position: "fixed",
+    top: "0px",
+    bottom: "auto",
+    left: "auto",
+    right: "auto",
+    rect: { top: 0, bottom: 48, left: 0, right: 1280, height: 48 },
+    style: "color: red",
+  });
+  const stickyTop = createViewportElement({
+    position: "sticky",
+    top: "0px",
+    bottom: "auto",
+    left: "auto",
+    right: "auto",
+    rect: { top: 0, bottom: 56, left: 0, right: 1280, height: 56 },
+  });
+  const bottom = createViewportElement({
+    position: "fixed",
+    top: "auto",
+    bottom: "0px",
+    left: "0px",
+    right: "0px",
+    rect: { top: 760, bottom: 800, left: 0, right: 1280, height: 40 },
+    style: "background: black",
+  });
+  const left = createViewportElement({
+    position: "fixed",
+    top: "0px",
+    bottom: "0px",
+    left: "0px",
+    right: "auto",
+    rect: { top: 0, bottom: 800, left: 0, right: 240, height: 800 },
+  });
+  const right = createViewportElement({
+    position: "sticky",
+    top: "0px",
+    bottom: "0px",
+    left: "auto",
+    right: "0px",
+    rect: { top: 0, bottom: 800, left: 1040, right: 1280, height: 800 },
+  });
+  const staticElement = createViewportElement({
+    position: "static",
+    top: "auto",
+    bottom: "auto",
+    left: "auto",
+    right: "auto",
+    rect: { top: 100, bottom: 200, left: 100, right: 200, height: 100 },
+  });
+  const elements = [top, stickyTop, bottom, left, right, staticElement];
+  const originalStyles = elements.map((element) => element.getAttribute("style"));
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousGetComputedStyle = globalThis.getComputedStyle;
+  globalThis.document = {
+    querySelectorAll: (selector) =>
+      selector === "body *"
+        ? elements
+        : elements.filter((element) => element.hasAttribute("data-page-screenshot-hidden")),
+  };
+  globalThis.window = { innerWidth: 1280, innerHeight: 800 };
+  globalThis.getComputedStyle = (element) => element.computedStyle;
+
+  try {
+    setViewportElementsForCapture("first");
+    assert.equal(top.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(left.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(right.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(staticElement.hasAttribute("data-page-screenshot-hidden"), false);
+
+    setViewportElementsForCapture("middle");
+    assert.equal(top.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
+
+    setViewportElementsForCapture("last");
+    assert.equal(top.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
+
+    restoreViewportElements();
+    assert.deepEqual(
+      elements.map((element) => element.getAttribute("style")),
+      originalStyles,
+    );
+    assert.equal(
+      elements.some((element) => element.hasAttribute("data-page-screenshot-hidden")),
+      false,
+    );
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.getComputedStyle = previousGetComputedStyle;
+  }
 });
 
 test("rejects invalid page metrics before creating tiles", () => {
