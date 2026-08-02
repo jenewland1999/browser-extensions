@@ -84,4 +84,20 @@ export const archives = [
       "fonts/geist-mono-latin-wght-normal.woff2",
     ],
   },
+  {
+    extension: "servicenow-advanced-service",
+    archive: "servicenow-advanced-service.zip",
+    files: [
+      "manifest.json",
+      "history.js",
+      "redirect.js",
+      "content.js",
+      "rules/application-service.json",
+      "icons/icon.svg",
+      "icons/icon-16.png",
+      "icons/icon-32.png",
+      "icons/icon-48.png",
+      "icons/icon-128.png",
+    ],
+  },
 ];

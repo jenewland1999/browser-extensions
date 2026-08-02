@@ -1,0 +1,20 @@
+{
+  "name": "@browser-extensions/servicenow-advanced-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Redirect ServiceNow application services to the advanced view.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "oxlint src scripts test",
+    "test": "pnpm run build && pnpm run test:unit",
+    "test:unit": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

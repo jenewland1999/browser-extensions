@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "regexSubstitution": "https://thespot.elanco.com/now/nav/ui/classic/params/target/cmdb_ci_service_auto.do%3Fsys_id%3D\\1%26sysparm_stack%3Dno"
+      }
+    },
+    "condition": {
+      "regexFilter": "^https://thespot\\.elanco\\.com/now/nav/ui/classic/params/target/%24csdm_app_service\\.do%3Fsys_id%3D([0-9a-fA-F]{32})",
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "regexSubstitution": "https://thespot.elanco.com/now/nav/ui/classic/params/target/cmdb_ci_service_auto.do%3Fsys_id%3D\\1%26sysparm_stack%3Dno"
+      }
+    },
+    "condition": {
+      "regexFilter": "^https://thespot\\.elanco\\.com/\\$csdm_app_service\\.do\\?sys_id=([0-9a-fA-F]{32})",
+      "resourceTypes": ["main_frame"]
+    }
+  }
+]

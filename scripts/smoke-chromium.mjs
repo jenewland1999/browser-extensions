@@ -111,7 +111,7 @@ const executable = await findExecutable();
 const profileDirectory = mkdtempSync(join(tmpdir(), "extension-smoke-"));
 const extensions = archives.map(({ extension, page, background = false }) => {
   const path = resolve("extensions", extension, "dist");
-  return { extension, page, background, path, id: extensionId(path) };
+  return { extension, page: page ?? null, background, path, id: extensionId(path) };
 });
 const extensionPaths = extensions.map(({ path }) => path).join(",");
 const arguments_ = [
@@ -139,6 +139,11 @@ try {
   const origin = `http://127.0.0.1:${port}`;
 
   for (const extension of extensions) {
+    if (extension.page === null) {
+      console.log(`Loaded ${extension.extension} (${extension.id}, no extension page).`);
+      continue;
+    }
+
     const url = `chrome-extension://${extension.id}/${extension.page}`;
     const response = await fetch(`${origin}/json/new?${encodeURI(url)}`, {
       method: "PUT",

@@ -5,12 +5,13 @@ Turborepo.
 
 ## Extensions
 
-| Extension                                          | Description                                            |
-| -------------------------------------------------- | ------------------------------------------------------ |
-| [`npmjs-to-npmx`](extensions/npmjs-to-npmx)        | Redirect compatible npmjs.com pages to npmx.dev.       |
-| [`page-screenshot`](extensions/page-screenshot)    | Capture viewport and full-page screenshots.            |
-| [`Reading List`](extensions/reading-list-exporter) | Import, export, and clear Chrome Reading List entries. |
-| [`Tessera`](extensions/tessera)                    | Build a nested, local-only new tab workspace.          |
+| Extension                                                               | Description                                                    |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [`npmjs-to-npmx`](extensions/npmjs-to-npmx)                             | Redirect compatible npmjs.com pages to npmx.dev.               |
+| [`page-screenshot`](extensions/page-screenshot)                         | Capture viewport and full-page screenshots.                    |
+| [`Reading List`](extensions/reading-list-exporter)                      | Import, export, and clear Chrome Reading List entries.         |
+| [`servicenow-advanced-service`](extensions/servicenow-advanced-service) | Redirect ServiceNow application services to the advanced view. |
+| [`Tessera`](extensions/tessera)                                         | Build a nested, local-only new tab workspace.                  |
 
 ## Requirements
 
@@ -30,7 +31,7 @@ pnpm validate
 `pnpm validate` checks formatting without changing files, then runs lint, type
 checking, build, tests, and exact ZIP-content checks. Run `pnpm format` to apply
 formatting and `pnpm smoke:chromium` to launch Chrome for Testing or Chromium
-with all four built extensions loaded unpacked.
+with all built extensions loaded unpacked.
 
 Root builds rewrite the generated archives with fixed timestamps and entry
 ordering for deterministic, cross-platform ZIP output.

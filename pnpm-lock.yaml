@@ -48,6 +48,12 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  extensions/servicenow-advanced-service:
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   extensions/tessera:
     devDependencies:
       '@fontsource-variable/geist':

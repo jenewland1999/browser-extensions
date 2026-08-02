@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "ServiceNow Advanced Application Service",
+  "description": "Open ServiceNow application services in the advanced view.",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["declarativeNetRequestWithHostAccess"],
+  "host_permissions": ["https://thespot.elanco.com/*"],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "application-service",
+        "enabled": true,
+        "path": "rules/application-service.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://thespot.elanco.com/*"],
+      "js": ["redirect.js", "history.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://thespot.elanco.com/*"],
+      "js": ["redirect.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}
