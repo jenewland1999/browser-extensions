@@ -6,6 +6,7 @@ export function setViewportElementsForCapture(phase: ViewportCapturePhase): void
   const hadStyleAttribute = "pageScreenshotHadStyle";
   const edgeTolerance = 2;
   const viewportHeight = window.innerHeight;
+  const viewportEdgeZone = Math.max(64, viewportHeight * 0.25);
 
   const restoreElement = (element: HTMLElement): void => {
     if (!element.hasAttribute(hiddenAttribute)) return;
@@ -32,9 +33,12 @@ export function setViewportElementsForCapture(phase: ViewportCapturePhase): void
   const getAttachment = (element: HTMLElement): "top" | "bottom" | "side" => {
     const computedStyle = getComputedStyle(element);
     const rect = element.getBoundingClientRect();
-    const top = isInsetSet(computedStyle.top) || rect.top <= edgeTolerance;
-    const bottom =
-      isInsetSet(computedStyle.bottom) || rect.bottom >= viewportHeight - edgeTolerance;
+    // Browsers resolve an unused inset to the remaining space. YouTube's fixed masthead,
+    // for example, reports `bottom: 521px` even though it is attached to the top of a 577px
+    // viewport. Use the rendered position for top/bottom attachment instead of treating every
+    // non-auto inset as an attachment signal.
+    const top = rect.top <= viewportEdgeZone;
+    const bottom = rect.bottom >= viewportHeight - viewportEdgeZone;
     const left = isInsetSet(computedStyle.left) || rect.left <= edgeTolerance;
     const right =
       isInsetSet(computedStyle.right) || rect.right >= window.innerWidth - edgeTolerance;

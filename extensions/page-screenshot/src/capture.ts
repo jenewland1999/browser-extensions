@@ -17,6 +17,7 @@ export const defaultSettings: CaptureSettings = {
 export const captureLimits = {
   maxCanvasDimension: 32_767,
   maxCanvasBytes: 256 * 1024 * 1024,
+  maxFullPageHeight: 10_000,
 } as const;
 
 export interface CaptureTabIdentity {
@@ -82,6 +83,15 @@ export function validatePageMetrics(metrics: PageMetrics): void {
   if (!Number.isFinite(metrics.scrollX) || !Number.isFinite(metrics.scrollY)) {
     throw new Error("Invalid scroll position reported by the page.");
   }
+}
+
+export function limitPageMetricsForCapture(metrics: PageMetrics): PageMetrics {
+  validatePageMetrics(metrics);
+  const maximumHeight = Math.max(metrics.viewportHeight, captureLimits.maxFullPageHeight);
+  return {
+    ...metrics,
+    height: Math.min(metrics.height, maximumHeight),
+  };
 }
 
 export function validateCanvasDimensions(

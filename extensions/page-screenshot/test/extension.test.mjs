@@ -6,9 +6,11 @@ import {
   assertCaptureTabUnchanged,
   CaptureLock,
   captureWithVerification,
+  captureLimits,
   createCaptureTiles,
   createFilename,
   getCaptureTilePhase,
+  limitPageMetricsForCapture,
   normalizeSettings,
   validateCanvasDimensions,
   validatePageMetrics,
@@ -114,7 +116,8 @@ test("handles viewport elements on all edges and restores their styles", () => {
   const top = createViewportElement({
     position: "fixed",
     top: "0px",
-    bottom: "auto",
+    // Chromium resolves YouTube's unused bottom inset to the remaining viewport space.
+    bottom: "521px",
     left: "auto",
     right: "auto",
     rect: { top: 0, bottom: 48, left: 0, right: 1280, height: 48 },
@@ -237,6 +240,19 @@ test("rejects invalid page metrics before creating tiles", () => {
   };
   assert.throws(() => validatePageMetrics(metrics), /Invalid viewport width/);
   assert.throws(() => createCaptureTiles(metrics), /Invalid viewport width/);
+});
+
+test("bounds full-page capture height for growing feeds", () => {
+  const metrics = {
+    width: 1280,
+    height: captureLimits.maxFullPageHeight + 5_000,
+    viewportWidth: 1280,
+    viewportHeight: 800,
+    scrollX: 0,
+    scrollY: 0,
+  };
+  assert.equal(limitPageMetricsForCapture(metrics).height, captureLimits.maxFullPageHeight);
+  assert.equal(limitPageMetricsForCapture({ ...metrics, height: 2_000 }).height, 2_000);
 });
 
 test("enforces canvas dimensions and estimated memory limits", () => {

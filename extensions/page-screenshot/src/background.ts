@@ -6,6 +6,7 @@ import {
   createFilename,
   defaultSettings,
   getCaptureTilePhase,
+  limitPageMetricsForCapture,
   normalizeSettings,
   validateCanvasDimensions,
   validatePageMetrics,
@@ -189,8 +190,11 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
   let context: OffscreenCanvasRenderingContext2D | null = null;
 
   try {
-    const metrics = await executeOnTab<PageMetrics>(tabId, readPageMetrics);
-    validatePageMetrics(metrics);
+    const measuredMetrics = await executeOnTab<PageMetrics>(tabId, readPageMetrics);
+    validatePageMetrics(measuredMetrics);
+    // Keep captures bounded so an infinite feed cannot turn the capture pass into an
+    // ever-growing scroll-and-load loop. The measured height is still used for ordinary pages.
+    const metrics = limitPageMetricsForCapture(measuredMetrics);
     validateCanvasDimensions(metrics.width, metrics.height);
     const tiles = createCaptureTiles(metrics);
     let scale = 1;

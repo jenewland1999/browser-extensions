@@ -42,7 +42,7 @@ Default shortcuts are `Command+Shift+1` / `Ctrl+Shift+1` for the viewport and `C
 
 ## Full-page capture
 
-Full-page capture scrolls down the page once, loading deferred content while stitching viewport captures. Fixed and sticky overlays are handled by the edge they are attached to:
+Full-page capture scrolls down the page once, loading deferred content while stitching viewport captures. To keep infinite feeds from continually loading new content, a full-page capture is capped at 10,000 CSS pixels; longer pages are intentionally truncated at that capture horizon. Fixed and sticky overlays are handled by the edge they are attached to:
 
 - Top overlays are visible in the first tile and hidden from later tiles.
 - Bottom overlays are hidden from the first and intermediate tiles and visible in the final tile.
