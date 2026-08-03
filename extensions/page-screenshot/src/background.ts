@@ -6,6 +6,7 @@ import {
   createFilename,
   defaultSettings,
   getCaptureTilePhase,
+  getScaledCaptureTile,
   limitPageMetricsForCapture,
   normalizeSettings,
   validateCanvasDimensions,
@@ -231,18 +232,27 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
           if (!context) throw new Error("Could not create screenshot canvas.");
         }
 
-        const width = Math.min(image.width, Math.round(tile.width * scale));
-        const height = Math.min(image.height, Math.round(tile.height * scale));
+        const scaledTile = getScaledCaptureTile(tile, scale);
+        const sourceWidth = Math.min(image.width - scaledTile.sourceX, scaledTile.sourceWidth);
+        const sourceHeight = Math.min(image.height - scaledTile.sourceY, scaledTile.sourceHeight);
+        if (
+          sourceWidth <= 0 ||
+          sourceHeight <= 0 ||
+          scaledTile.destinationWidth <= 0 ||
+          scaledTile.destinationHeight <= 0
+        ) {
+          throw new Error("The browser returned an invalid screenshot tile.");
+        }
         context?.drawImage(
           image,
-          Math.round(tile.sourceX * scale),
-          Math.round(tile.sourceY * scale),
-          width,
-          height,
-          Math.round(tile.x * scale),
-          Math.round(tile.y * scale),
-          width,
-          height,
+          scaledTile.sourceX,
+          scaledTile.sourceY,
+          sourceWidth,
+          sourceHeight,
+          scaledTile.destinationX,
+          scaledTile.destinationY,
+          scaledTile.destinationWidth,
+          scaledTile.destinationHeight,
         );
       } finally {
         image.close();

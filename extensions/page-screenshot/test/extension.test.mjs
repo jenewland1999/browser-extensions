@@ -10,6 +10,7 @@ import {
   createCaptureTiles,
   createFilename,
   getCaptureTilePhase,
+  getScaledCaptureTile,
   limitPageMetricsForCapture,
   normalizeSettings,
   validateCanvasDimensions,
@@ -75,6 +76,26 @@ test("creates full-page tiles including partial edges", () => {
       { y: 1400, height: 100, scrollY: 800, sourceY: 600 },
     ],
   );
+});
+
+test("keeps scaled tile edges continuous", () => {
+  const tiles = createCaptureTiles({
+    width: 1280,
+    height: 2_000,
+    viewportWidth: 1280,
+    viewportHeight: 577,
+    scrollX: 0,
+    scrollY: 0,
+  });
+  const scaledTiles = tiles.map((tile) => getScaledCaptureTile(tile, 2544 / 1280));
+
+  for (let index = 1; index < scaledTiles.length; index += 1) {
+    const previous = scaledTiles[index - 1];
+    const current = scaledTiles[index];
+    assert.equal(previous.destinationY + previous.destinationHeight, current.destinationY);
+  }
+  assert.equal(scaledTiles[2].destinationHeight, 1_146);
+  assert.throws(() => getScaledCaptureTile(tiles[0], 0), /Invalid screenshot scale/);
 });
 
 test("assigns the correct visibility phase to each capture tile", () => {

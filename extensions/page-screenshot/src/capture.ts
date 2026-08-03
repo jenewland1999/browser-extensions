@@ -192,6 +192,32 @@ export function createCaptureTiles(metrics: PageMetrics): CaptureTile[] {
   return tiles;
 }
 
+export function getScaledCaptureTile(tile: CaptureTile, scale: number): ScaledCaptureTile {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    throw new Error(`Invalid screenshot scale: ${scale}.`);
+  }
+
+  const sourceX = Math.round(tile.sourceX * scale);
+  const sourceY = Math.round(tile.sourceY * scale);
+  const sourceRight = Math.round((tile.sourceX + tile.width) * scale);
+  const sourceBottom = Math.round((tile.sourceY + tile.height) * scale);
+  const destinationX = Math.round(tile.x * scale);
+  const destinationY = Math.round(tile.y * scale);
+  const destinationRight = Math.round((tile.x + tile.width) * scale);
+  const destinationBottom = Math.round((tile.y + tile.height) * scale);
+
+  return {
+    sourceX,
+    sourceY,
+    sourceWidth: sourceRight - sourceX,
+    sourceHeight: sourceBottom - sourceY,
+    destinationX,
+    destinationY,
+    destinationWidth: destinationRight - destinationX,
+    destinationHeight: destinationBottom - destinationY,
+  };
+}
+
 export type CaptureTilePhase = "single" | "first" | "middle" | "last";
 
 export function getCaptureTilePhase(index: number, tileCount: number): CaptureTilePhase {
@@ -228,4 +254,15 @@ export interface CaptureTile {
   scrollY: number;
   sourceX: number;
   sourceY: number;
+}
+
+export interface ScaledCaptureTile {
+  sourceX: number;
+  sourceY: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  destinationX: number;
+  destinationY: number;
+  destinationWidth: number;
+  destinationHeight: number;
 }
