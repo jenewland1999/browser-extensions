@@ -5,6 +5,9 @@ import {
   createCaptureTiles,
   createFilename,
   defaultSettings,
+  getCaptureTilePhase,
+  getScaledCaptureTile,
+  limitPageMetricsForCapture,
   normalizeSettings,
   validateCanvasDimensions,
   validatePageMetrics,
@@ -12,6 +15,7 @@ import {
   type CaptureTabIdentity,
   type PageMetrics,
 } from "./capture.js";
+import { restoreViewportElements, setViewportElementsForCapture } from "./viewport-elements.js";
 
 type CaptureType = "viewport" | "full-page";
 interface CaptureResult {
@@ -122,31 +126,6 @@ async function scrollPage(x: number, y: number): Promise<void> {
   );
 }
 
-function hideViewportElements(): void {
-  for (const element of document.querySelectorAll<HTMLElement>("body *")) {
-    if (element.hasAttribute("data-page-screenshot-hidden")) continue;
-    const position = getComputedStyle(element).position;
-    if (position !== "fixed" && position !== "sticky") continue;
-    element.dataset["pageScreenshotStyle"] = element.getAttribute("style") ?? "";
-    element.dataset["pageScreenshotHadStyle"] = String(element.hasAttribute("style"));
-    element.dataset["pageScreenshotHidden"] = "";
-    element.style.setProperty("opacity", "0", "important");
-    element.style.setProperty("pointer-events", "none", "important");
-  }
-}
-
-function restoreViewportElements(): void {
-  for (const element of document.querySelectorAll<HTMLElement>("[data-page-screenshot-hidden]")) {
-    const style = element.dataset["pageScreenshotStyle"] ?? "";
-    const hadStyle = element.dataset["pageScreenshotHadStyle"] === "true";
-    delete element.dataset["pageScreenshotStyle"];
-    delete element.dataset["pageScreenshotHadStyle"];
-    delete element.dataset["pageScreenshotHidden"];
-    if (hadStyle) element.setAttribute("style", style);
-    else element.removeAttribute("style");
-  }
-}
-
 async function executeOnTab<T>(
   tabId: number,
   func: (...args: never[]) => T | Promise<T>,
@@ -212,16 +191,25 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
   let context: OffscreenCanvasRenderingContext2D | null = null;
 
   try {
-    const metrics = await executeOnTab<PageMetrics>(tabId, readPageMetrics);
-    validatePageMetrics(metrics);
+    const measuredMetrics = await executeOnTab<PageMetrics>(tabId, readPageMetrics);
+    validatePageMetrics(measuredMetrics);
+    // Keep captures bounded so an infinite feed cannot turn the capture pass into an
+    // ever-growing scroll-and-load loop. The measured height is still used for ordinary pages.
+    const metrics = limitPageMetricsForCapture(measuredMetrics);
     validateCanvasDimensions(metrics.width, metrics.height);
     const tiles = createCaptureTiles(metrics);
     let scale = 1;
     let lastCaptureTime = 0;
 
+    if (tiles.length > 1) {
+      // Hide bottom-attached viewport elements before the initial scroll and capture pass.
+      await executeOnTab(tabId, setViewportElementsForCapture, ["first"] as never[]);
+    }
+
     for (const [index, tile] of tiles.entries()) {
       await executeOnTab(tabId, scrollPage, [tile.scrollX, tile.scrollY] as never[]);
-      if (index > 0) await executeOnTab(tabId, hideViewportElements);
+      const phase = getCaptureTilePhase(index, tiles.length);
+      await executeOnTab(tabId, setViewportElementsForCapture, [phase] as never[]);
       await wait(Math.max(0, 600 - (Date.now() - lastCaptureTime)));
       const dataUrl = await captureWithVerification(
         () => verifyCaptureTab(tab),
@@ -244,18 +232,27 @@ async function captureFullPage(settings: CaptureSettings): Promise<void> {
           if (!context) throw new Error("Could not create screenshot canvas.");
         }
 
-        const width = Math.min(image.width, Math.round(tile.width * scale));
-        const height = Math.min(image.height, Math.round(tile.height * scale));
+        const scaledTile = getScaledCaptureTile(tile, scale);
+        const sourceWidth = Math.min(image.width - scaledTile.sourceX, scaledTile.sourceWidth);
+        const sourceHeight = Math.min(image.height - scaledTile.sourceY, scaledTile.sourceHeight);
+        if (
+          sourceWidth <= 0 ||
+          sourceHeight <= 0 ||
+          scaledTile.destinationWidth <= 0 ||
+          scaledTile.destinationHeight <= 0
+        ) {
+          throw new Error("The browser returned an invalid screenshot tile.");
+        }
         context?.drawImage(
           image,
-          Math.round(tile.sourceX * scale),
-          Math.round(tile.sourceY * scale),
-          width,
-          height,
-          Math.round(tile.x * scale),
-          Math.round(tile.y * scale),
-          width,
-          height,
+          scaledTile.sourceX,
+          scaledTile.sourceY,
+          sourceWidth,
+          sourceHeight,
+          scaledTile.destinationX,
+          scaledTile.destinationY,
+          scaledTile.destinationWidth,
+          scaledTile.destinationHeight,
         );
       } finally {
         image.close();
