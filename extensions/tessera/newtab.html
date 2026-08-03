@@ -348,38 +348,167 @@
           />
         </section>
         <section class="settings-group">
-          <h2>Data</h2>
+          <h2>Import and export</h2>
           <p class="hint">Stored on this device. Tessera never syncs or sends data.</p>
-          <h3>Groups and links</h3>
-          <div class="button-row">
-            <button class="secondary-button" id="import-items" type="button" data-icon="upload">
-              Import
-            </button>
-            <button class="secondary-button" id="export-items" type="button" data-icon="download">
-              Export
-            </button>
-          </div>
-          <h3>App settings</h3>
-          <div class="button-row">
-            <button class="secondary-button" id="import-settings" type="button" data-icon="upload">
-              Import
-            </button>
+          <div class="transfer-block">
+            <h3>Export</h3>
+            <label class="field switch-field">
+              <span>Groups and links</span>
+              <input id="export-items" type="checkbox" role="switch" checked />
+              <span class="switch-track" aria-hidden="true"
+                ><span class="switch-thumb"></span
+              ></span>
+            </label>
+            <label class="field switch-field">
+              <span>App settings</span>
+              <input id="export-settings" type="checkbox" role="switch" checked />
+              <span class="switch-track" aria-hidden="true"
+                ><span class="switch-thumb"></span
+              ></span>
+            </label>
             <button
-              class="secondary-button"
-              id="export-settings"
+              class="secondary-button transfer-button"
+              id="export-data"
               type="button"
               data-icon="download"
             >
               Export
             </button>
           </div>
-          <input id="import-file" type="file" accept="application/json,.json" hidden />
+          <div class="transfer-block">
+            <button
+              class="secondary-button transfer-button"
+              id="import-data"
+              type="button"
+              data-icon="upload"
+            >
+              Import
+            </button>
+          </div>
+        </section>
+        <section class="settings-group danger-zone">
+          <h2>Danger Zone</h2>
           <button class="danger-button" id="clear-grid" type="button" data-icon="trash">
             Clear entire grid
           </button>
         </section>
       </div>
     </aside>
+
+    <dialog id="import-dialog" class="import-dialog" aria-labelledby="import-title">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">Bring it in</p>
+          <h2 id="import-title">Import a workspace</h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-import"
+          type="button"
+          data-icon="x"
+          aria-label="Close import"
+        ></button>
+      </div>
+      <div class="import-dialog-content">
+        <section id="import-picker" class="import-picker">
+          <div class="import-picker-copy">
+            <h3>Choose a workspace file</h3>
+            <p>
+              Import a Tessera export or a JSON export from Structured Start Tab. You can choose a
+              file, drop it here, or paste its JSON contents.
+            </p>
+          </div>
+          <button class="primary-button" id="choose-import-file" type="button" data-icon="upload">
+            Choose file
+          </button>
+          <div
+            id="import-drop-zone"
+            class="import-drop-zone"
+            role="button"
+            tabindex="0"
+            aria-describedby="import-drop-help"
+          >
+            <span class="import-drop-icon" data-icon="upload"></span>
+            <strong>Drop a JSON file here</strong>
+            <span id="import-drop-help">or paste JSON from your clipboard</span>
+          </div>
+        </section>
+        <section id="import-review" class="import-review" hidden>
+          <div class="import-file-summary">
+            <span class="import-file-mark" data-icon="upload"></span>
+            <div>
+              <strong id="import-file-name"></strong>
+              <span id="import-file-source"></span>
+            </div>
+          </div>
+          <div id="import-error" class="import-error" role="alert" hidden>
+            <strong>We couldn’t use this file</strong>
+            <p id="import-error-message"></p>
+            <a
+              class="secondary-button"
+              id="report-import-bug"
+              href="https://github.com/jenewland1999/browser-extensions/issues/new?template=bug_report.md"
+              target="_blank"
+              data-icon="bug"
+              >Report a bug</a
+            >
+          </div>
+          <div id="import-review-body" class="import-review-body">
+            <section class="import-selection">
+              <div>
+                <h3>Include</h3>
+                <p class="hint">Choose which parts of this file to bring into Tessera.</p>
+              </div>
+              <label class="field switch-field">
+                <span>Groups and links</span>
+                <input id="import-items" type="checkbox" role="switch" />
+                <span class="switch-track" aria-hidden="true"
+                  ><span class="switch-thumb"></span
+                ></span>
+              </label>
+              <label class="field switch-field">
+                <span>App settings</span>
+                <input id="import-settings" type="checkbox" role="switch" />
+                <span class="switch-track" aria-hidden="true"
+                  ><span class="switch-thumb"></span
+                ></span>
+              </label>
+            </section>
+            <section class="import-preview-section">
+              <div>
+                <h3>Preview</h3>
+                <p class="hint">Review the content before you import it.</p>
+              </div>
+              <div class="import-preview-list">
+                <details id="import-items-preview" open>
+                  <summary>
+                    <span>Groups and links</span>
+                    <strong id="import-items-count"></strong>
+                  </summary>
+                  <div id="import-items-list" class="import-tree"></div>
+                </details>
+                <details id="import-settings-preview" open>
+                  <summary>
+                    <span>App settings</span>
+                    <strong id="import-settings-count"></strong>
+                  </summary>
+                  <div id="import-settings-list" class="import-settings-list"></div>
+                </details>
+              </div>
+            </section>
+          </div>
+          <div class="dialog-actions">
+            <button class="secondary-button" id="choose-import-another" type="button">
+              Choose another file
+            </button>
+            <button class="primary-button" id="confirm-import" type="button" disabled>
+              Import
+            </button>
+          </div>
+        </section>
+      </div>
+      <input id="import-file" type="file" accept="application/json,.json" hidden />
+    </dialog>
 
     <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
       <div class="dialog-header">
@@ -435,8 +564,8 @@
         <section>
           <h3>Import and export</h3>
           <p>
-            Groups and links can be backed up separately from app settings, so you can move a layout
-            without replacing your theme or apply settings without replacing your links.
+            Export groups and links, app settings, or both. Import a Tessera or Structured Start Tab
+            JSON file, review its contents, and choose what to bring in before confirming.
           </p>
         </section>
       </div>
