@@ -370,3 +370,4 @@ $RECYCLE.BIN/
 # Project-specific generated extension output
 dist/
 _metadata/
+release-assets/
