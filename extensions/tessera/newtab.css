@@ -421,7 +421,8 @@ a:focus-visible {
 .toolbar {
   position: fixed;
   z-index: 40;
-  top: 16px;
+  top: auto;
+  bottom: 12px;
   left: 50%;
   display: flex;
   width: max-content;
@@ -458,7 +459,7 @@ a:focus-visible {
 @keyframes toolbar-enter {
   from {
     opacity: 0;
-    transform: translate(var(--toolbar-enter-x), var(--toolbar-enter-y));
+    translate: 0 var(--toolbar-enter-y);
   }
 }
 

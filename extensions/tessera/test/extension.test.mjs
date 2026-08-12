@@ -534,6 +534,21 @@ test("anchored toolbar centers within docked canvas", async () => {
   assert.match(script, /addEventListener\("resize", repositionAnchoredToolbar\)/);
 });
 
+test("new and reset toolbars default to the bottom centre anchor", async () => {
+  const [script, css] = await Promise.all([
+    readFile("dist/newtab.js", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
+  ]);
+  assert.match(
+    script,
+    /function setDefaultToolbarPosition\(\) \{\s+toolbarAnchor = "south";[\s\S]+if \(toolbar\.hidden\) \{\s+void chrome\.storage\.local\.set\(\{ toolbarAnchor \}\);\s+return;/,
+  );
+  assert.match(script, /render\(\);\s+setDefaultToolbarPosition\(\);\s+\}/);
+  assert.match(script, /else \{\s+setDefaultToolbarPosition\(\);\s+\}/);
+  assert.match(script, /if \(!toolbarAnchor \|\| toolbar\.hidden\)\s+return;/);
+  assert.match(css, /\.toolbar \{[\s\S]+top: auto;\s+bottom: 12px;\s+left: 50%;/);
+});
+
 test("edit mode preserves the toolbar centre", async () => {
   const script = await readFile("dist/newtab.js", "utf8");
   assert.match(script, /const toolbarCenter =/);
@@ -550,16 +565,23 @@ test("docked inspector animates toolbar and canvas shifts", async () => {
   assert.match(css, /\.canvas \{[\s\S]+margin-left 220ms/);
 });
 
-test("toolbar enters from its saved screen region", async () => {
+test("toolbar enters straight up from below", async () => {
   const [script, css] = await Promise.all([
     readFile("dist/newtab.js", "utf8"),
     readFile("dist/newtab.css", "utf8"),
   ]);
   assert.match(script, /function animateToolbarEntrance/);
-  assert.match(script, /centerX < window\.innerWidth \/ 3/);
-  assert.match(script, /centerY > \(window\.innerHeight \* 2\) \/ 3/);
+  assert.match(script, /window\.innerHeight - rect\.top/);
+  assert.match(script, /removeProperty\("--toolbar-enter-y"\)/);
+  assert.match(script, /const toolbarWasHidden = toolbar\.hidden !== false/);
+  assert.match(
+    script,
+    /function finishToolbarReveal\(wasHidden\)[\s\S]+toolbar\.classList\.add\("initializing"\);[\s\S]+positionFloatingElement\(toolbar, toolbarPosition\);[\s\S]+requestAnimationFrame[\s\S]+animateToolbarEntrance\(\)/,
+  );
   assert.match(css, /\.toolbar\.initializing \{[\s\S]+transition: none/);
-  assert.match(css, /@keyframes toolbar-enter \{[\s\S]+--toolbar-enter-x/);
+  assert.match(css, /@keyframes toolbar-enter \{[\s\S]+translate: 0 var\(--toolbar-enter-y\)/);
+  assert.doesNotMatch(css, /@keyframes toolbar-enter \{\s+from \{[^}]*transform:/);
+  assert.doesNotMatch(css, /--toolbar-enter-x/);
 });
 
 test("section counter follows actions at far right", async () => {
