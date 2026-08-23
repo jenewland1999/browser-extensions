@@ -39,7 +39,7 @@ jobs:
       - name: Calculate stable version
         id: version
         run: >-
-          node scripts/release-version.mjs stable
+          node scripts/release-version.js stable
           --candidate "$CANDIDATE_TAG"
           --main-ref "origin/$DEFAULT_BRANCH"
           >> "$GITHUB_OUTPUT"

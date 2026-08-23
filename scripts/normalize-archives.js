@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { zipSync } from "fflate";
 
-import { archives } from "./archive-spec.mjs";
+import { archives } from "./archive-spec.js";
 
 // Constructed in local time because ZIP stores calendar fields without a time zone.
 const timestamp = new Date(1980, 0, 1);

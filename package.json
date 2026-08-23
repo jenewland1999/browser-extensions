@@ -5,25 +5,25 @@
   "type": "module",
   "scripts": {
     "build": "turbo run build && pnpm normalize:archives",
-    "build:release": "node scripts/build-release.mjs",
+    "build:release": "node scripts/build-release.js",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint scripts tests && turbo run lint",
-    "normalize:archives": "node scripts/normalize-archives.mjs",
-    "smoke:chromium": "node scripts/smoke-chromium.mjs",
-    "test": "turbo run test:unit && node --test tests/release-version.test.mjs",
-    "test:archives": "node --test tests/archive-contents.test.mjs",
+    "normalize:archives": "node scripts/normalize-archives.js",
+    "smoke:chromium": "node scripts/smoke-chromium.js",
+    "test": "turbo run test:unit && node --test tests/release-version.test.js",
+    "test:archives": "node --test tests/archive-contents.test.js",
     "typecheck": "turbo run typecheck",
     "validate": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm normalize:archives && pnpm test:archives"
   },
   "devDependencies": {
     "fflate": "0.8.3",
-    "oxfmt": "0.63.0",
-    "oxlint": "1.78.0",
-    "turbo": "2.10.9"
+    "oxfmt": "0.64.0",
+    "oxlint": "1.79.0",
+    "turbo": "2.10.11"
   },
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72"
+  "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621"
 }

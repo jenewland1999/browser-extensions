@@ -13,11 +13,11 @@ import {
   parseCanaryTag,
   parseStableTag,
   recommendedBump,
-} from "../scripts/release-version.mjs";
-import { releaseAssetName, validateReleaseMetadata } from "../scripts/build-release.mjs";
+} from "../scripts/release-version.js";
+import { releaseAssetName, validateReleaseMetadata } from "../scripts/build-release.js";
 
 const releaseVersionScript = fileURLToPath(
-  new URL("../scripts/release-version.mjs", import.meta.url),
+  new URL("../scripts/release-version.js", import.meta.url),
 );
 
 function outputMap(output) {
