@@ -11,6 +11,7 @@ const archiveFiles = [
   "popup.js",
   "background.js",
   "capture.js",
+  "viewport-elements.js",
   "icons/icon.svg",
   "icons/icon-16.png",
   "icons/icon-32.png",
