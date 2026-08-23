@@ -878,6 +878,7 @@ function setSelectionMode(enabled: boolean): void {
 }
 
 function render(skipEditor = false): void {
+  const toolbarWasHidden = toolbar.hidden !== false;
   canvas.replaceChildren();
   const empty = data.sections.length === 0;
   const firstRun = empty && !onboardingComplete;
@@ -911,6 +912,7 @@ function render(skipEditor = false): void {
         ?.addEventListener("click", openImportDialog);
       canvas.append(emptyState);
       if (!skipEditor) renderEditor();
+      finishToolbarReveal(toolbarWasHidden);
       return;
     }
     toolbar.hidden = true;
@@ -965,7 +967,7 @@ function render(skipEditor = false): void {
     for (const section of data.sections) canvas.append(renderNode(section, 1));
   }
   if (!skipEditor) renderEditor();
-  repositionAnchoredToolbar();
+  finishToolbarReveal(toolbarWasHidden);
 }
 
 const GUIDE_STEPS = [
@@ -1706,6 +1708,7 @@ function positionFloatingElement(element: HTMLElement, position: ToolbarPosition
   element.style.left = `${x}px`;
   element.style.top = `${y}px`;
   element.style.right = "auto";
+  element.style.bottom = "auto";
   element.style.transform = "none";
 }
 
@@ -1720,22 +1723,34 @@ function positionToolbarAtCenter(center: ToolbarPosition): void {
 function animateToolbarEntrance(): void {
   if (toolbar.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const rect = toolbar.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const offset = 48;
-  const x =
-    centerX < window.innerWidth / 3 ? -offset : centerX > (window.innerWidth * 2) / 3 ? offset : 0;
-  const y =
-    centerY < window.innerHeight / 3
-      ? -offset
-      : centerY > (window.innerHeight * 2) / 3
-        ? offset
-        : 0;
-  toolbar.style.setProperty("--toolbar-enter-x", `${x}px`);
-  toolbar.style.setProperty("--toolbar-enter-y", `${y}px`);
+  toolbar.style.setProperty("--toolbar-enter-y", `${window.innerHeight - rect.top}px`);
   toolbar.classList.add("entering");
-  toolbar.addEventListener("animationend", () => toolbar.classList.remove("entering"), {
-    once: true,
+  toolbar.addEventListener(
+    "animationend",
+    () => {
+      toolbar.classList.remove("entering");
+      toolbar.style.removeProperty("--toolbar-enter-y");
+    },
+    { once: true },
+  );
+}
+
+function finishToolbarReveal(wasHidden: boolean): void {
+  if (toolbar.hidden) return;
+  if (!wasHidden) {
+    repositionAnchoredToolbar();
+    return;
+  }
+  toolbar.classList.add("initializing");
+  if (toolbarAnchor) {
+    toolbarPosition = anchorPosition(toolbar, toolbarAnchor);
+    positionFloatingElement(toolbar, toolbarPosition);
+  } else if (toolbarPosition) {
+    positionFloatingElement(toolbar, toolbarPosition);
+  }
+  window.requestAnimationFrame(() => {
+    toolbar.classList.remove("initializing");
+    animateToolbarEntrance();
   });
 }
 
@@ -1748,6 +1763,23 @@ function persistToolbarPosition(): void {
     reference: "center",
   };
   void chrome.storage.local.set({ toolbarPosition: position, toolbarAnchor });
+}
+
+function setDefaultToolbarPosition(): void {
+  toolbarAnchor = "south";
+  toolbarPosition = undefined;
+  toolbar.style.removeProperty("left");
+  toolbar.style.removeProperty("top");
+  toolbar.style.removeProperty("right");
+  toolbar.style.removeProperty("bottom");
+  toolbar.style.removeProperty("transform");
+  if (toolbar.hidden) {
+    void chrome.storage.local.set({ toolbarAnchor });
+    return;
+  }
+  toolbarPosition = anchorPosition(toolbar, toolbarAnchor);
+  positionFloatingElement(toolbar, toolbarPosition);
+  persistToolbarPosition();
 }
 
 function enableToolbarDrag(): void {
@@ -1823,9 +1855,10 @@ function anchorPosition(element: HTMLElement, name: string): { x: number; y: num
 }
 
 function repositionAnchoredToolbar(): void {
-  if (!toolbarAnchor) return;
+  if (!toolbarAnchor || toolbar.hidden) return;
   window.requestAnimationFrame(() => {
-    toolbarPosition = anchorPosition(toolbar, toolbarAnchor!);
+    if (!toolbarAnchor || toolbar.hidden) return;
+    toolbarPosition = anchorPosition(toolbar, toolbarAnchor);
     positionFloatingElement(toolbar, toolbarPosition);
   });
 }
@@ -2375,6 +2408,7 @@ async function resetExtension(): Promise<void> {
   toolbar.removeAttribute("style");
   applyAppearance();
   render();
+  setDefaultToolbarPosition();
 }
 
 requireElement<HTMLButtonElement>("#add-section").addEventListener("click", () => addSection());
@@ -2843,10 +2877,7 @@ async function initialize(): Promise<void> {
     positionFloatingElement(toolbar, toolbarPosition);
     persistToolbarPosition();
   } else {
-    positionFloatingElement(toolbar, {
-      x: (window.innerWidth - toolbar.offsetWidth) / 2,
-      y: 16,
-    });
+    setDefaultToolbarPosition();
   }
   window.requestAnimationFrame(() => {
     toolbar.classList.remove("initializing");

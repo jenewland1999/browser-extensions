@@ -6,12 +6,20 @@ import {
   assertCaptureTabUnchanged,
   CaptureLock,
   captureWithVerification,
+  captureLimits,
   createCaptureTiles,
   createFilename,
+  getCaptureTilePhase,
+  getScaledCaptureTile,
+  limitPageMetricsForCapture,
   normalizeSettings,
   validateCanvasDimensions,
   validatePageMetrics,
 } from "../dist/capture.js";
+import {
+  restoreViewportElements,
+  setViewportElementsForCapture,
+} from "../dist/viewport-elements.js";
 
 const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 
@@ -19,7 +27,29 @@ test("build emits loadable extension files", async () => {
   const outputFiles = await readdir("dist", { recursive: true });
   assert.ok(outputFiles.includes("popup.js"));
   assert.ok(outputFiles.includes("manifest.json"));
+  assert.ok(outputFiles.includes("viewport-elements.js"));
   assert.ok(outputFiles.every((path) => !path.endsWith(".ts")));
+});
+
+test("keeps the popup inside Chrome's action surface", async () => {
+  const popupCss = await readFile("dist/popup.css", "utf8");
+  const htmlLayout = popupCss.match(/html \{[\s\S]*?\n\}/)?.[0] ?? "";
+  const bodyLayout = popupCss.match(/body \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(htmlLayout, /width: 360px/);
+  assert.match(htmlLayout, /height: 580px/);
+  assert.match(htmlLayout, /overflow: hidden/);
+  assert.match(bodyLayout, /width: 360px/);
+  assert.match(bodyLayout, /height: 580px/);
+  assert.match(bodyLayout, /overflow-y: auto/);
+});
+
+test("hides bottom overlays before the first scroll", async () => {
+  const background = await readFile("dist/background.js", "utf8");
+  const initialHide = background.indexOf('setViewportElementsForCapture, ["first"]');
+  const firstScroll = background.indexOf("scrollPage, [tile.scrollX, tile.scrollY]");
+  assert.ok(initialHide >= 0);
+  assert.ok(firstScroll >= 0);
+  assert.ok(initialHide < firstScroll);
 });
 
 test("uses only screenshot permissions", () => {
@@ -48,6 +78,190 @@ test("creates full-page tiles including partial edges", () => {
   );
 });
 
+test("keeps scaled tile edges continuous", () => {
+  const tiles = createCaptureTiles({
+    width: 1280,
+    height: 2_000,
+    viewportWidth: 1280,
+    viewportHeight: 577,
+    scrollX: 0,
+    scrollY: 0,
+  });
+  const scaledTiles = tiles.map((tile) => getScaledCaptureTile(tile, 2544 / 1280));
+
+  for (let index = 1; index < scaledTiles.length; index += 1) {
+    const previous = scaledTiles[index - 1];
+    const current = scaledTiles[index];
+    assert.equal(previous.destinationY + previous.destinationHeight, current.destinationY);
+  }
+  assert.equal(scaledTiles[2].destinationHeight, 1_146);
+  assert.throws(() => getScaledCaptureTile(tiles[0], 0), /Invalid screenshot scale/);
+});
+
+test("assigns the correct visibility phase to each capture tile", () => {
+  assert.equal(getCaptureTilePhase(0, 1), "single");
+  assert.equal(getCaptureTilePhase(0, 3), "first");
+  assert.equal(getCaptureTilePhase(1, 3), "middle");
+  assert.equal(getCaptureTilePhase(2, 3), "last");
+  assert.throws(() => getCaptureTilePhase(3, 3), /Invalid capture tile position/);
+});
+
+function createViewportElement({ position, top, bottom, left, right, rect, style = null }) {
+  let styleAttribute = style;
+  const attributes = new Set(style === null ? [] : ["style"]);
+  const dataset = Object.create(null);
+  const element = {
+    dataset,
+    computedStyle: { position, top, bottom, left, right },
+    style: {
+      setProperty(name, value, priority) {
+        styleAttribute = `${styleAttribute ?? ""}${styleAttribute ? "; " : ""}${name}: ${value}${priority ? ` !${priority}` : ""}`;
+        attributes.add("style");
+      },
+    },
+    getAttribute(name) {
+      return name === "style" ? styleAttribute : null;
+    },
+    setAttribute(name, value) {
+      if (name === "style") {
+        styleAttribute = value;
+        attributes.add("style");
+      }
+    },
+    removeAttribute(name) {
+      if (name === "style") {
+        styleAttribute = null;
+        attributes.delete("style");
+      }
+    },
+    hasAttribute(name) {
+      if (name === "data-page-screenshot-hidden") return dataset.pageScreenshotHidden !== undefined;
+      return attributes.has(name);
+    },
+    getBoundingClientRect() {
+      return rect;
+    },
+  };
+  return element;
+}
+
+test("handles viewport elements on all edges and restores their styles", () => {
+  const top = createViewportElement({
+    position: "fixed",
+    top: "0px",
+    // Chromium resolves YouTube's unused bottom inset to the remaining viewport space.
+    bottom: "521px",
+    left: "auto",
+    right: "auto",
+    rect: { top: 0, bottom: 48, left: 0, right: 1280, height: 48 },
+    style: "color: red",
+  });
+  const stickyTop = createViewportElement({
+    position: "sticky",
+    top: "0px",
+    bottom: "auto",
+    left: "auto",
+    right: "auto",
+    rect: { top: 0, bottom: 56, left: 0, right: 1280, height: 56 },
+  });
+  const bottom = createViewportElement({
+    position: "fixed",
+    top: "760px",
+    bottom: "0px",
+    left: "0px",
+    right: "0px",
+    rect: { top: 760, bottom: 800, left: 0, right: 1280, height: 40 },
+    style: "background: black",
+  });
+  const left = createViewportElement({
+    position: "fixed",
+    top: "0px",
+    bottom: "0px",
+    left: "0px",
+    right: "auto",
+    rect: { top: 0, bottom: 800, left: 0, right: 240, height: 800 },
+  });
+  const offsetLeftRail = createViewportElement({
+    position: "fixed",
+    top: "56px",
+    bottom: "0px",
+    left: "0px",
+    right: "1040px",
+    rect: { top: 56, bottom: 800, left: 0, right: 240, height: 744 },
+  });
+  const right = createViewportElement({
+    position: "sticky",
+    top: "0px",
+    bottom: "0px",
+    left: "auto",
+    right: "0px",
+    rect: { top: 0, bottom: 800, left: 1040, right: 1280, height: 800 },
+  });
+  const staticElement = createViewportElement({
+    position: "static",
+    top: "auto",
+    bottom: "auto",
+    left: "auto",
+    right: "auto",
+    rect: { top: 100, bottom: 200, left: 100, right: 200, height: 100 },
+  });
+  const elements = [top, stickyTop, bottom, left, offsetLeftRail, right, staticElement];
+  const originalStyles = elements.map((element) => element.getAttribute("style"));
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousGetComputedStyle = globalThis.getComputedStyle;
+  globalThis.document = {
+    querySelectorAll: (selector) =>
+      selector === "body *"
+        ? elements
+        : elements.filter((element) => element.hasAttribute("data-page-screenshot-hidden")),
+  };
+  globalThis.window = { innerWidth: 1280, innerHeight: 800 };
+  globalThis.getComputedStyle = (element) => element.computedStyle;
+
+  try {
+    setViewportElementsForCapture("first");
+    assert.equal(top.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(left.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(offsetLeftRail.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(right.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(staticElement.hasAttribute("data-page-screenshot-hidden"), false);
+
+    setViewportElementsForCapture("middle");
+    assert.equal(top.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(offsetLeftRail.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
+
+    setViewportElementsForCapture("last");
+    assert.equal(top.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(stickyTop.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(bottom.hasAttribute("data-page-screenshot-hidden"), false);
+    assert.equal(bottom.getAttribute("style"), "background: black");
+    assert.equal(left.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(offsetLeftRail.hasAttribute("data-page-screenshot-hidden"), true);
+    assert.equal(right.hasAttribute("data-page-screenshot-hidden"), true);
+
+    restoreViewportElements();
+    assert.deepEqual(
+      elements.map((element) => element.getAttribute("style")),
+      originalStyles,
+    );
+    assert.equal(
+      elements.some((element) => element.hasAttribute("data-page-screenshot-hidden")),
+      false,
+    );
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.getComputedStyle = previousGetComputedStyle;
+  }
+});
+
 test("rejects invalid page metrics before creating tiles", () => {
   const metrics = {
     width: 1000,
@@ -59,6 +273,19 @@ test("rejects invalid page metrics before creating tiles", () => {
   };
   assert.throws(() => validatePageMetrics(metrics), /Invalid viewport width/);
   assert.throws(() => createCaptureTiles(metrics), /Invalid viewport width/);
+});
+
+test("bounds full-page capture height for growing feeds", () => {
+  const metrics = {
+    width: 1280,
+    height: captureLimits.maxFullPageHeight + 5_000,
+    viewportWidth: 1280,
+    viewportHeight: 800,
+    scrollX: 0,
+    scrollY: 0,
+  };
+  assert.equal(limitPageMetricsForCapture(metrics).height, captureLimits.maxFullPageHeight);
+  assert.equal(limitPageMetricsForCapture({ ...metrics, height: 2_000 }).height, 2_000);
 });
 
 test("enforces canvas dimensions and estimated memory limits", () => {
