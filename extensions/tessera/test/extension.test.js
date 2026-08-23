@@ -86,6 +86,7 @@ test("new tab exposes theme and background choices", async () => {
   assert.match(html, /name="background-type"[^>]+value="blank"/);
   assert.match(html, /name="background-type"[^>]+value="pattern"/);
   assert.match(html, /name="background-type"[^>]+value="image"/);
+  assert.doesNotMatch(css, /\.segmented \{[^}]+padding:/);
   assert.match(html, /id="background-drop-zone"/);
   assert.match(html, /id="pattern-picker-list" role="listbox"/);
 });
@@ -202,6 +203,23 @@ test("normalizes new appearance and link settings", () => {
   assert.equal(imported.sections[0]?.children[0]?.faviconRadius, 50);
 });
 
+test("bounds space shares", () => {
+  const imported = parseImport({
+    version: 1,
+    sections: [
+      {
+        id: "section",
+        type: "section",
+        name: "Section",
+        direction: "vertical",
+        grow: 20,
+        children: [],
+      },
+    ],
+  });
+  assert.equal(imported.sections[0]?.grow, 6);
+});
+
 test("normalizes every supported theme, background, and accent", () => {
   for (const theme of THEMES) {
     assert.equal(parseImport({ version: 1, theme, sections: [] }).theme, theme);
@@ -307,9 +325,12 @@ test("uses a reviewed import dialog and independent export switches", async () =
   assert.match(html, /id="import-data"/);
   assert.match(html, /id="import-dialog"/);
   const importDropZone = html.match(/<div\s+[^>]*id="import-drop-zone"[^>]*>/)?.[0] ?? "";
-  assert.match(importDropZone, /class="import-drop-zone"/);
+  assert.match(importDropZone, /class="file-drop-zone import-drop-zone"/);
   assert.match(importDropZone, /role="button"/);
   assert.match(importDropZone, /tabindex="0"/);
+  assert.doesNotMatch(html, /id="choose-import-file"/);
+  assert.match(html, /class="file-drop-zone background-drop-zone"/);
+  assert.match(script, /dropZone\.classList\.add\("file-drop-zone"\)/);
   assert.match(html, /id="import-items" type="checkbox" role="switch"/);
   assert.match(html, /id="import-settings" type="checkbox" role="switch"/);
   assert.match(html, /id="confirm-import" type="button" disabled/);
@@ -491,6 +512,30 @@ test("docked inspector stays open when the canvas is clicked", async () => {
   const script = await readFile("dist/newtab.js", "utf8");
   assert.match(script, /document\.body\.classList\.contains\("inspector-docked"\)/);
   assert.match(script, /event\.key !== "Escape"/);
+});
+
+test("settings pane reserves space for its scrollbar", async () => {
+  const css = await readFile("dist/newtab.css", "utf8");
+  assert.match(css, /\.panel \{[\s\S]+?scrollbar-gutter: stable;/);
+  assert.match(css, /\.panel-header::after,[\s\S]+?width: 100vw;/);
+  assert.doesNotMatch(css, /\.panel-header \{[^}]+border-bottom:/);
+});
+
+test("nested space shares fill while top-level sections fit content", async () => {
+  const [html, script, css] = await Promise.all([
+    readFile("dist/newtab.html", "utf8"),
+    readFile("dist/newtab.js", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
+  ]);
+  assert.doesNotMatch(html, /id="section-height-mode"/);
+  assert.match(script, /function shareContext\(node\)/);
+  assert.match(script, /\$\{context\.axis\} share/);
+  assert.match(script, /name="grow" type="range" min="1" max="6"/);
+  assert.doesNotMatch(script, /Fit content/);
+  assert.match(css, /\.canvas > \.section \{[\s\S]+?flex: 0 0 auto;/);
+  assert.match(script, /if \(!parent\)\s+return undefined;/);
+  assert.match(css, /\.section-content\.direction-vertical > \*/);
+  assert.match(css, /\.section-content > \.section\.collapsed/);
 });
 
 test("favicon and emoji controls have spacious aligned layouts", async () => {

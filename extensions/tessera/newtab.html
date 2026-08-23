@@ -335,9 +335,18 @@
             </select>
           </div>
           <div id="image-controls" hidden>
-            <div id="background-drop-zone" class="background-drop-zone" tabindex="0">
-              <strong>Drop, paste, or click</strong>
-              <span>PNG, JPEG, WebP, GIF, or SVG</span>
+            <div
+              id="background-drop-zone"
+              class="file-drop-zone background-drop-zone"
+              role="button"
+              tabindex="0"
+              aria-describedby="background-drop-help"
+            >
+              <span class="file-drop-zone-icon" data-icon="upload"></span>
+              <strong>Drop, paste, or click to choose</strong>
+              <span id="background-drop-help" class="file-drop-zone-help"
+                >PNG, JPEG, WebP, GIF, or SVG</span
+              >
             </div>
           </div>
           <input
@@ -413,24 +422,18 @@
         <section id="import-picker" class="import-picker">
           <div class="import-picker-copy">
             <h3>Choose a workspace file</h3>
-            <p>
-              Import a Tessera export or a JSON export from Structured Start Tab. You can choose a
-              file, drop it here, or paste its JSON contents.
-            </p>
+            <p>Import a Tessera export or a JSON export from Structured Start Tab.</p>
           </div>
-          <button class="primary-button" id="choose-import-file" type="button" data-icon="upload">
-            Choose file
-          </button>
           <div
             id="import-drop-zone"
-            class="import-drop-zone"
+            class="file-drop-zone import-drop-zone"
             role="button"
             tabindex="0"
             aria-describedby="import-drop-help"
           >
-            <span class="import-drop-icon" data-icon="upload"></span>
-            <strong>Drop a JSON file here</strong>
-            <span id="import-drop-help">or paste JSON from your clipboard</span>
+            <span class="file-drop-zone-icon" data-icon="upload"></span>
+            <strong>Drop, paste, or click to choose</strong>
+            <span id="import-drop-help" class="file-drop-zone-help">JSON files only</span>
           </div>
         </section>
         <section id="import-review" class="import-review" hidden>

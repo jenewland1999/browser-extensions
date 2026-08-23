@@ -56,7 +56,6 @@ const lockButton = requireElement<HTMLButtonElement>("#lock");
 const importDialog = requireElement<HTMLDialogElement>("#import-dialog");
 const importInput = requireElement<HTMLInputElement>("#import-file");
 const importDataButton = requireElement<HTMLButtonElement>("#import-data");
-const chooseImportFileButton = requireElement<HTMLButtonElement>("#choose-import-file");
 const chooseImportAnotherButton = requireElement<HTMLButtonElement>("#choose-import-another");
 const importDropZone = requireElement<HTMLElement>("#import-drop-zone");
 const importPicker = requireElement<HTMLElement>("#import-picker");
@@ -1286,6 +1285,24 @@ function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
+interface ShareContext {
+  axis: "Width" | "Height";
+  siblings: Node[];
+}
+
+function shareContext(node: Node): ShareContext | undefined {
+  const parent = findParentSection(data.sections, node.id);
+  const siblings: Node[] = parent?.children ?? data.sections;
+  if (siblings.length < 2) return undefined;
+  if (!parent) return undefined;
+  return { axis: parent.direction === "horizontal" ? "Width" : "Height", siblings };
+}
+
+function shareSummary(node: Node, siblings: Node[]): string {
+  const total = siblings.reduce((sum, sibling) => sum + sibling.grow, 0);
+  return `${node.grow} of ${total} shares across ${siblings.length} items.`;
+}
+
 function renderEditor(): void {
   const node = selectedId ? findNode(data.sections, selectedId) : undefined;
   for (const select of editor.querySelectorAll<HTMLSelectElement>("select[data-enhanced='true']"))
@@ -1303,7 +1320,11 @@ function renderEditor(): void {
   const commonBeforeSize = `
     ${inputField("Name", node.name, "name")}
     <label class="field"><span>Accent</span><select name="color">${ACCENTS.map((color) => `<option value="${color}"${node.color === color ? " selected" : ""}>${color[0]?.toUpperCase()}${color.slice(1)}</option>`).join("")}</select></label>`;
-  const sizeField = `<label class="field"><span>Size</span><input name="grow" type="range" min="1" max="16" value="${node.grow}" /><output>${node.grow}</output></label>`;
+  const context = shareContext(node);
+  const shareField = context
+    ? `<div class="space-share"><label class="field range-field"><span>${context.axis} share</span><input name="grow" type="range" min="1" max="6" value="${node.grow}" /><output>${node.grow}</output></label><p class="share-summary">${shareSummary(node, context.siblings)}</p></div>`
+    : "";
+  const sizeField = shareField;
   const iconSource =
     node.type === "link"
       ? node.icon === ""
@@ -1316,12 +1337,20 @@ function renderEditor(): void {
     node.type === "section"
       ? `<section class="node-fields"><h2>Appearance</h2>${commonBeforeSize}
         <label class="field"><span>Flow</span><select name="direction"><option value="horizontal"${node.direction === "horizontal" ? " selected" : ""}>Horizontal</option><option value="vertical"${node.direction === "vertical" ? " selected" : ""}>Vertical</option></select></label>
-        ${sizeField}</section>
+        ${shareField}</section>
         <section class="settings-group inspector-actions"><h2>Actions</h2><div class="button-row"><button class="secondary-button" name="add-link" type="button">${icon("link", 15)} Add link</button><button class="secondary-button" name="add-section" type="button">${icon("panel-top", 15)} Nest section</button></div><button class="danger-button" name="delete" type="button">${icon("trash", 15)} Delete section</button></section>`
       : `<section class="node-fields"><h2>Appearance</h2>${commonBeforeSize}${sizeField}${inputField("URL", node.url, "url", "url")}
         <label class="field"><span>Open in</span><select name="openMode"><option value="current"${node.openMode === "current" ? " selected" : ""}>Current tab</option><option value="tab"${node.openMode === "tab" ? " selected" : ""}>New tab</option><option value="window"${node.openMode === "window" ? " selected" : ""}>New window</option></select></label>
         <fieldset class="icon-field"><div class="icon-heading"><legend>Icon</legend><span class="icon-preview${node.icon === "" && faviconBackgroundEnabled(node) ? " favicon-backed" : ""}" style="${faviconStyle(node)}">${renderNodeIcon(node)}</span></div><div class="icon-source-tabs" role="tablist" aria-label="Icon source"><button type="button" name="use-favicon" role="tab" aria-selected="${iconSource === "favicon"}">Favicon</button><button type="button" name="use-emoji" role="tab" aria-selected="${iconSource === "emoji"}">Emoji</button><button type="button" name="use-custom" role="tab" aria-selected="${iconSource === "custom"}">Icon</button></div><div class="icon-source-panel favicon-panel"${iconSource === "favicon" ? "" : " hidden"}><label class="field switch-field favicon-background-field"><span>Background (${darkScheme() ? "dark" : "light"} theme)</span><input name="faviconBackground" type="checkbox" role="switch"${faviconBackgroundEnabled(node) ? " checked" : ""} /><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></label><label class="field range-field"><span>Roundedness</span><input name="faviconRadius" type="range" min="0" max="50" value="${node.faviconRadius}" /><output>${node.faviconRadius}%</output></label><label class="field range-field"><span>Padding</span><input name="faviconPadding" type="range" min="0" max="8" value="${node.faviconPadding}" /><output>${node.faviconPadding}px</output></label></div><div class="emoji-picker"${iconSource === "emoji" ? "" : " hidden"}><div class="emoji-picker-toolbar"><input class="emoji-search" name="emoji-search" type="search" placeholder="Search all emojis" autocomplete="off" /><label class="tone-field"><span>Skin tone</span><select class="tone-select" aria-label="Default skin tone">${SKIN_TONES.map((tone) => `<option value="${tone}"${emojiSkinTone === tone ? " selected" : ""}>${applySkinTone("👋", tone)}</option>`).join("")}</select></label></div><div class="emoji-shelves"></div><div class="emoji-categories" role="tablist" aria-label="Emoji categories"></div><div class="emoji-grid" aria-live="polite"></div><p class="emoji-empty" hidden>No emojis found.</p></div><div class="icon-drop-zone" tabindex="0"${iconSource === "custom" ? "" : " hidden"}><strong>Drop, paste, or click</strong><span>PNG, JPEG, WebP, GIF, or SVG</span><input name="icon-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden /></div></fieldset></section>
         <section class="settings-group link-actions"><h2>Actions</h2><button class="secondary-button" name="duplicate" type="button">${icon("copy", 15)} Duplicate link</button><button class="danger-button" name="delete" type="button">${icon("trash", 15)} Delete link</button></section>`;
+  const spaceShare = form.querySelector<HTMLElement>(".space-share");
+  if (spaceShare) {
+    const layoutInParent = document.createElement("section");
+    layoutInParent.className = "node-fields layout-in-parent";
+    layoutInParent.innerHTML = "<h2>Layout in parent</h2>";
+    layoutInParent.append(spaceShare);
+    form.querySelector(".settings-group")?.before(layoutInParent);
+  }
   if (node.type === "link")
     form.querySelector(".icon-preview")?.replaceChildren(createNodeIcon(node));
   form.addEventListener("input", (event) => {
@@ -1329,6 +1358,17 @@ function renderEditor(): void {
     if (target.closest(".emoji-picker") || target.matches("input[name='url']")) return;
     if (node.type === "link" && target.matches("input[name='name']")) node.autoName = false;
     updateFromForm(node, form);
+    if (target.matches("select[name='direction']")) {
+      renderEditor();
+      return;
+    }
+    if (target.matches("input[name='grow']")) {
+      const latestContext = shareContext(node);
+      if (latestContext)
+        form
+          .querySelector(".share-summary")
+          ?.replaceChildren(shareSummary(node, latestContext.siblings));
+    }
     if (node.type === "link" && target.matches("input[name='faviconBackground']"))
       form
         .querySelector(".icon-preview")
@@ -1383,9 +1423,11 @@ function updateFromForm(node: Node, form: HTMLFormElement): void {
   const values = new FormData(form);
   node.name = String(values.get("name") ?? node.name).trimStart();
   node.color = String(values.get("color") ?? "slate") as (typeof ACCENTS)[number];
-  node.grow = Number(values.get("grow") ?? 1);
-  if (node.type === "section") node.direction = String(values.get("direction")) as Direction;
-  else {
+  const growValue = values.get("grow");
+  if (growValue !== null) node.grow = Number(growValue);
+  if (node.type === "section") {
+    node.direction = String(values.get("direction")) as Direction;
+  } else {
     node.unmodifiedDuplicate = false;
     node.url = String(values.get("url") ?? "");
     node.openMode = String(values.get("openMode") ?? "current") as OpenMode;
@@ -1403,6 +1445,17 @@ function bindLinkEditor(form: HTMLFormElement, node: LinkNode): void {
   const faviconPanel = form.querySelector<HTMLElement>(".favicon-panel");
   const iconInput = form.querySelector<HTMLInputElement>("input[name='icon-file']");
   const urlInput = form.querySelector<HTMLInputElement>("input[name='url']");
+  if (dropZone) {
+    dropZone.classList.add("file-drop-zone");
+    dropZone.setAttribute("role", "button");
+    dropZone.querySelector("strong")?.replaceChildren("Drop, paste, or click to choose");
+    const help = dropZone.querySelector("span");
+    help?.classList.add("file-drop-zone-help");
+    dropZone.insertAdjacentHTML(
+      "afterbegin",
+      `<span class="file-drop-zone-icon">${icon("upload", 16)}</span>`,
+    );
+  }
   let urlTimer = 0;
   urlInput?.addEventListener("input", () => {
     node.unmodifiedDuplicate = false;
@@ -1471,7 +1524,9 @@ function bindLinkEditor(form: HTMLFormElement, node: LinkNode): void {
   if (!emojiPicker?.hidden) void initializeEmojiPicker(form, node);
   dropZone?.addEventListener("click", () => iconInput?.click());
   dropZone?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") iconInput?.click();
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    iconInput?.click();
   });
   dropZone?.addEventListener("dragover", (event) => {
     event.preventDefault();
@@ -2465,7 +2520,6 @@ exportDataButton.addEventListener("click", () => {
   }
 });
 requireElement<HTMLButtonElement>("#close-import").addEventListener("click", closeImportDialog);
-chooseImportFileButton.addEventListener("click", () => importInput.click());
 chooseImportAnotherButton.addEventListener("click", () => {
   resetImportDialog();
   window.requestAnimationFrame(() => importDropZone.focus());
@@ -2744,7 +2798,9 @@ pagePaddingInput.addEventListener("input", () => {
 });
 backgroundDropZone.addEventListener("click", () => backgroundInput.click());
 backgroundDropZone.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") backgroundInput.click();
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  backgroundInput.click();
 });
 backgroundDropZone.addEventListener("dragover", (event) => {
   event.preventDefault();

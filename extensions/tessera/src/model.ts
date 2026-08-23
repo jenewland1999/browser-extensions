@@ -196,7 +196,7 @@ function text(value: unknown, fallback: string): string {
 
 function grow(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? Math.min(16, Math.max(1, Math.round(parsed))) : 1;
+  return Number.isFinite(parsed) ? Math.min(6, Math.max(1, Math.round(parsed))) : 1;
 }
 
 function boundedNumber(value: unknown, fallback: number, maximum: number): number {
