@@ -296,17 +296,66 @@ test("accent controls show swatches and preview choices", async () => {
   assert.match(css, /\.accent-list button::before/);
 });
 
-test("imports and exports items separately from settings", async () => {
-  const [html, script] = await Promise.all([
+test("uses a reviewed import dialog and independent export switches", async () => {
+  const [html, script, css] = await Promise.all([
     readFile("dist/newtab.html", "utf8"),
     readFile("dist/newtab.js", "utf8"),
+    readFile("dist/newtab.css", "utf8"),
   ]);
-  assert.match(html, /id="import-items"/);
-  assert.match(html, /id="export-settings"/);
-  assert.match(script, /type === "items"/);
-  assert.match(script, /data\.sections = imported\.sections/);
-  assert.match(script, /sections: data\.sections/);
-  assert.match(script, /tessera-settings/);
+  assert.match(html, /id="export-items" type="checkbox" role="switch" checked/);
+  assert.match(html, /id="export-settings" type="checkbox" role="switch" checked/);
+  assert.match(html, /id="import-data"/);
+  assert.match(html, /id="import-dialog"/);
+  const importDropZone = html.match(/<div\s+[^>]*id="import-drop-zone"[^>]*>/)?.[0] ?? "";
+  assert.match(importDropZone, /class="import-drop-zone"/);
+  assert.match(importDropZone, /role="button"/);
+  assert.match(importDropZone, /tabindex="0"/);
+  assert.match(html, /id="import-items" type="checkbox" role="switch"/);
+  assert.match(html, /id="import-settings" type="checkbox" role="switch"/);
+  assert.match(html, /id="confirm-import" type="button" disabled/);
+  assert.match(html, /id="import-items-preview"/);
+  assert.match(html, /id="import-settings-preview"/);
+  assert.match(html, /id="report-import-bug"/);
+  assert.match(html, /id="export-data"/);
+  assert.match(
+    html,
+    /<section class="settings-group danger-zone">[\s\S]+<h2>Danger Zone<\/h2>[\s\S]+id="clear-grid"/,
+  );
+  assert.doesNotMatch(html, /<div class="transfer-block">\s*<h3>Import<\/h3>/);
+  assert.match(
+    css,
+    /\.import-dialog\[open\] \{[\s\S]+display: flex;[\s\S]+flex-direction: column;/,
+  );
+  assert.match(css, /\.import-dialog-content \{[\s\S]+overflow-y: auto;/);
+  assert.match(css, /\.import-preview-list \{[\s\S]+height: clamp\(/);
+  assert.match(css, /\.import-preview-list \{[\s\S]+grid-auto-rows: max-content;/);
+  assert.match(css, /\.import-preview-list \{[\s\S]+overflow-y: scroll;/);
+  assert.match(css, /\.import-error \.secondary-button \{[\s\S]+text-decoration: none;/);
+  assert.match(css, /\.import-selection \{[\s\S]+padding: 0;/);
+  assert.match(css, /\.import-selection \.field \{[\s\S]+background: transparent;/);
+  assert.match(css, /\.import-tree-item\.link \{[\s\S]+grid-template-columns: 14px/);
+  assert.match(css, /\.import-tree-item\.link \{[\s\S]+border: 1px solid/);
+  const importSelectionFieldStyle =
+    css.match(/\.import-selection \.field \{([\s\S]+?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(importSelectionFieldStyle, /border-bottom/);
+  const dialogActionsStyle = css.match(/\.dialog-actions \{([\s\S]+?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(dialogActionsStyle, /border-top/);
+  assert.match(script, /type: "tessera-export"/);
+  assert.match(script, /payload\.sections = sections/);
+  assert.match(script, /payload\.settings = settings/);
+  assert.match(script, /openImportDialog/);
+  assert.match(script, /readImportCandidate/);
+  assert.match(script, /Structured Start Tab/);
+  assert.match(script, /clipboardData/);
+  assert.match(script, /drag-over/);
+  assert.match(script, /icon\("external-link", 14\)/);
+  assert.match(script, /import-tree-heading/);
+  assert.match(script, /import-tree-section/);
+  assert.match(script, /import-tree-url/);
+  assert.match(script, /importCandidateData/);
+  assert.match(script, /This replaces all groups and links currently in your grid\./);
+  assert.match(script, /countImportSections\(sections\)/);
+  assert.match(script, /This JSON is not a Tessera or Structured Start Tab export/);
 });
 
 test("new tab debounces favicon updates and uses emoji controls", async () => {

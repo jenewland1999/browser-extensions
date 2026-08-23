@@ -11,8 +11,8 @@ Calm Chromium new tab workspace built from nested sections and link tiles.
 - Theme-specific favicon contrast backgrounds with adjustable padding and roundedness
 - Browser/system, light, dark, Rosé Pine, Vercel, and GitHub themes
 - Custom spacing, background colours, images, and 21 pattern choices
-- Separate JSON import and export for groups/links and app settings
-- Structured Start Tab legacy JSON import
+- Selective JSON import and export for groups/links, app settings, or both
+- Reviewed JSON import from Tessera and Structured Start Tab, with drag/drop and clipboard paste
 - 22 vibrant Tailwind-inspired accents
 - Built-in help, guided onboarding, and a confirmed full reset
 

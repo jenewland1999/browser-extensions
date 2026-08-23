@@ -53,7 +53,31 @@ const pageSettings = requireElement<HTMLElement>("#page-settings");
 const panelTitle = requireElement<HTMLElement>("#panel-title");
 const settingsButton = requireElement<HTMLButtonElement>("#settings");
 const lockButton = requireElement<HTMLButtonElement>("#lock");
+const importDialog = requireElement<HTMLDialogElement>("#import-dialog");
 const importInput = requireElement<HTMLInputElement>("#import-file");
+const importDataButton = requireElement<HTMLButtonElement>("#import-data");
+const chooseImportFileButton = requireElement<HTMLButtonElement>("#choose-import-file");
+const chooseImportAnotherButton = requireElement<HTMLButtonElement>("#choose-import-another");
+const importDropZone = requireElement<HTMLElement>("#import-drop-zone");
+const importPicker = requireElement<HTMLElement>("#import-picker");
+const importReview = requireElement<HTMLElement>("#import-review");
+const importReviewBody = requireElement<HTMLElement>("#import-review-body");
+const importError = requireElement<HTMLElement>("#import-error");
+const importErrorMessage = requireElement<HTMLElement>("#import-error-message");
+const importFileName = requireElement<HTMLElement>("#import-file-name");
+const importFileSource = requireElement<HTMLElement>("#import-file-source");
+const importItemsInput = requireElement<HTMLInputElement>("#import-items");
+const importSettingsInput = requireElement<HTMLInputElement>("#import-settings");
+const importItemsPreview = requireElement<HTMLElement>("#import-items-preview");
+const importSettingsPreview = requireElement<HTMLElement>("#import-settings-preview");
+const importItemsCount = requireElement<HTMLElement>("#import-items-count");
+const importSettingsCount = requireElement<HTMLElement>("#import-settings-count");
+const importItemsList = requireElement<HTMLElement>("#import-items-list");
+const importSettingsList = requireElement<HTMLElement>("#import-settings-list");
+const confirmImportButton = requireElement<HTMLButtonElement>("#confirm-import");
+const exportItemsInput = requireElement<HTMLInputElement>("#export-items");
+const exportSettingsInput = requireElement<HTMLInputElement>("#export-settings");
+const exportDataButton = requireElement<HTMLButtonElement>("#export-data");
 const toast = requireElement<HTMLElement>("#toast");
 const themeSelect = requireElement<HTMLSelectElement>("#theme");
 const densitySelect = requireElement<HTMLSelectElement>("#density");
@@ -107,13 +131,53 @@ let lastSectionId: string | undefined;
 let selectionMode = false;
 const selectedIds = new Set<string>();
 let faviconRevision = 0;
-let importType: "items" | "settings" = "items";
 
 interface StoredData {
   storageVersion: 1;
   revision: number;
   data: StartPageData;
 }
+
+interface TransferSelection {
+  items: boolean;
+  settings: boolean;
+}
+
+type ImportSource = "Tessera" | "Structured Start Tab";
+type TesseraSettings = Omit<StartPageData, "sections">;
+
+interface ImportCandidate {
+  fileName: string;
+  source: ImportSource;
+  sections?: SectionNode[];
+  settings?: TesseraSettings;
+}
+
+interface TesseraExportPayload {
+  type: "tessera-export";
+  version: 1;
+  sections?: SectionNode[];
+  settings?: Omit<StartPageData, "sections">;
+}
+
+const IMPORT_SETTING_FIELDS = [
+  "locked",
+  "theme",
+  "density",
+  "itemGap",
+  "sectionGap",
+  "pagePadding",
+  "backgroundType",
+  "backgroundPattern",
+  "backgroundImage",
+  "backgroundColor",
+  "inspectorMode",
+  "inspectorSide",
+  "showItemCounts",
+] as const;
+
+let importCandidate: ImportCandidate | undefined;
+let importReadToken = 0;
 
 interface EmojiGroup {
   name: string;
@@ -845,7 +909,7 @@ function render(skipEditor = false): void {
         ?.addEventListener("click", () => addLink());
       emptyState
         .querySelector<HTMLButtonElement>("[data-empty='import']")
-        ?.addEventListener("click", () => importInput.click());
+        ?.addEventListener("click", openImportDialog);
       canvas.append(emptyState);
       if (!skipEditor) renderEditor();
       finishToolbarReveal(toolbarWasHidden);
@@ -895,7 +959,7 @@ function render(skipEditor = false): void {
       });
     welcome
       .querySelector<HTMLButtonElement>("[data-welcome='import']")
-      ?.addEventListener("click", () => importInput.click());
+      ?.addEventListener("click", openImportDialog);
     renderGuide(welcome);
     canvas.append(welcome);
   } else {
@@ -1799,22 +1863,373 @@ function repositionAnchoredToolbar(): void {
   });
 }
 
-async function importJson(file: File, type: "items" | "settings"): Promise<void> {
-  const input = JSON.parse(await file.text()) as unknown;
-  if (type === "items") {
-    const imported = parseImport(input);
-    data.sections = imported.sections;
-    showToast(`Imported ${data.sections.length} groups.`);
-  } else {
-    if (!input || typeof input !== "object" || Array.isArray(input))
-      throw new Error("Choose a Tessera settings or full export file.");
-    const source = "settings" in input ? (input as { settings?: unknown }).settings : input;
-    if (!source || typeof source !== "object" || Array.isArray(source))
-      throw new Error("Choose a Tessera settings or full export file.");
-    const imported = parseImport({ ...source, version: 1, sections: data.sections });
-    data = imported;
-    showToast("Imported app settings.");
+function getExportSelection(): TransferSelection {
+  return { items: exportItemsInput.checked, settings: exportSettingsInput.checked };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function hasImportSettings(value: Record<string, unknown>): boolean {
+  return IMPORT_SETTING_FIELDS.some((field) => field in value);
+}
+
+function parseImportedSections(input: unknown): SectionNode[] {
+  if (Array.isArray(input)) return parseImport(input).sections;
+  const source = asRecord(input);
+  if (!source || !("sections" in source))
+    throw new Error("This file does not contain a groups and links section.");
+  if (!Array.isArray(source["sections"]))
+    throw new Error("The groups and links section must be a JSON array.");
+  return parseImport({ version: 1, sections: source["sections"] }).sections;
+}
+
+function importSettingsSource(input: unknown): Record<string, unknown> | undefined {
+  const inputRecord = asRecord(input);
+  if (!inputRecord) return undefined;
+  const type = inputRecord["type"];
+  if ("settings" in inputRecord) {
+    const source = asRecord(inputRecord["settings"]);
+    if (!source) throw new Error("The app settings section must be a JSON object.");
+    if (!hasImportSettings(source)) throw new Error("The app settings section is empty.");
+    return source;
   }
+  if (type === "tessera-settings") throw new Error("The app settings section is missing.");
+  if (type === "tessera-items" || type === "tessera-export") return undefined;
+  return hasImportSettings(inputRecord) ? inputRecord : undefined;
+}
+
+function identifyImportSource(input: unknown): ImportSource {
+  if (Array.isArray(input)) return "Structured Start Tab";
+  const inputRecord = asRecord(input);
+  if (!inputRecord) {
+    throw new Error("The file must contain a JSON object or a Structured Start Tab array.");
+  }
+  const type = inputRecord["type"];
+  if (
+    type === "tessera-items" ||
+    type === "tessera-settings" ||
+    type === "tessera-export" ||
+    (inputRecord["version"] === 1 &&
+      ("sections" in inputRecord || "settings" in inputRecord || hasImportSettings(inputRecord)))
+  ) {
+    return "Tessera";
+  }
+  throw new Error("This JSON is not a Tessera or Structured Start Tab export.");
+}
+
+function parseImportedSettings(input: unknown, sections: SectionNode[]): StartPageData {
+  const source = importSettingsSource(input);
+  if (!source) throw new Error("This file does not contain app settings.");
+  return parseImport({ ...source, version: 1, sections });
+}
+
+function inspectImport(input: unknown, fileName: string): ImportCandidate {
+  const source = identifyImportSource(input);
+  const inputRecord = asRecord(input);
+  const hasSections =
+    Array.isArray(input) || (inputRecord !== undefined && "sections" in inputRecord);
+  const sections = hasSections ? parseImportedSections(input) : undefined;
+  const settingsSource = importSettingsSource(input);
+  let settings: TesseraSettings | undefined;
+  if (settingsSource) {
+    const normalized = parseImportedSettings(input, sections ?? data.sections);
+    const { sections: _sections, ...normalizedSettings } = normalized;
+    settings = normalizedSettings;
+  }
+  if (sections === undefined && settings === undefined) {
+    throw new Error("This file contains neither groups and links nor app settings.");
+  }
+  const candidate: ImportCandidate = { fileName: fileName || "Pasted JSON", source };
+  if (sections !== undefined) candidate.sections = sections;
+  if (settings !== undefined) candidate.settings = settings;
+  return candidate;
+}
+
+async function readImportCandidate(file: File): Promise<ImportCandidate> {
+  let text: string;
+  try {
+    text = await file.text();
+  } catch {
+    throw new Error(
+      "Tessera could not read this file. Check that it is still available and try again.",
+    );
+  }
+  let input: unknown;
+  try {
+    input = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      "This file is not valid JSON. Choose a Tessera export or a Structured Start Tab JSON export.",
+    );
+  }
+  return inspectImport(input, file.name);
+}
+
+function formatImportError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Tessera could not read this file.";
+  if (message === "Unsupported JSON format.") {
+    return "This is not a supported JSON export. Choose a Tessera export or a Structured Start Tab JSON export.";
+  }
+  if (message === "No sections found in JSON.") {
+    return "No groups were found. The file needs at least one Structured Start Tab group or a Tessera sections array.";
+  }
+  return message;
+}
+
+function countImportSections(nodes: Node[]): number {
+  return nodes.reduce(
+    (count, node) => count + (node.type === "section" ? 1 + countImportSections(node.children) : 0),
+    0,
+  );
+}
+
+function countImportLinks(nodes: Node[]): number {
+  return nodes.reduce(
+    (count, node) => count + (node.type === "link" ? 1 : countImportLinks(node.children)),
+    0,
+  );
+}
+
+function formatImportNodeSummary(nodes: Node[]): string {
+  const groups = countImportSections(nodes);
+  const links = countImportLinks(nodes);
+  const parts = [];
+  if (groups > 0) parts.push(`${groups} ${groups === 1 ? "group" : "groups"}`);
+  if (links > 0) parts.push(`${links} ${links === 1 ? "link" : "links"}`);
+  return parts.join(" · ") || "Empty group";
+}
+
+function appendImportTree(nodes: Node[], container: HTMLElement): void {
+  const list = document.createElement("ul");
+  for (const node of nodes) {
+    const item = document.createElement("li");
+    item.className = `import-tree-item ${node.type}`;
+    if (node.type === "section") {
+      const sectionDetails = document.createElement("details");
+      sectionDetails.className = "import-tree-section";
+      sectionDetails.open = true;
+      const summary = document.createElement("summary");
+      const heading = document.createElement("span");
+      heading.className = "import-tree-heading";
+      const label = document.createElement("span");
+      label.className = "import-tree-label";
+      label.textContent = node.name;
+      const count = document.createElement("span");
+      count.className = "import-tree-count";
+      count.textContent = formatImportNodeSummary(node.children);
+      heading.append(label, count);
+      summary.append(heading);
+      sectionDetails.append(summary);
+      if (node.children.length > 0) {
+        appendImportTree(node.children, sectionDetails);
+      } else {
+        const empty = document.createElement("p");
+        empty.className = "import-empty";
+        empty.textContent = "This group is empty.";
+        sectionDetails.append(empty);
+      }
+      item.append(sectionDetails);
+    } else {
+      const linkIcon = document.createElement("span");
+      linkIcon.className = "import-tree-link-icon";
+      linkIcon.innerHTML = icon("external-link", 14);
+      const label = document.createElement("span");
+      label.className = "import-tree-label";
+      label.textContent = node.name;
+      const url = document.createElement("span");
+      url.className = "import-tree-url";
+      url.textContent = node.url;
+      item.append(linkIcon, label, url);
+    }
+    list.append(item);
+  }
+  container.append(list);
+}
+
+function importTitle(value: string): string {
+  return value
+    .split("-")
+    .map((word) => (word ? word[0]!.toUpperCase() + word.slice(1) : ""))
+    .join(" ");
+}
+
+function renderImportItemsPreview(sections: SectionNode[]): void {
+  importItemsList.replaceChildren();
+  if (sections.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "import-empty";
+    empty.textContent = "This export contains no groups yet.";
+    importItemsList.append(empty);
+    return;
+  }
+  appendImportTree(sections, importItemsList);
+}
+
+function renderImportSettingsPreview(settings: TesseraSettings): void {
+  const background =
+    settings.backgroundType === "image"
+      ? "Uploaded image"
+      : settings.backgroundType === "pattern"
+        ? `Pattern · ${importTitle(settings.backgroundPattern)}`
+        : "Blank";
+  const rows: Array<[string, string]> = [
+    ["Theme", settings.theme === "system" ? "Browser / system" : importTitle(settings.theme)],
+    ["Density", importTitle(settings.density)],
+    [
+      "Spacing",
+      `Items ${settings.itemGap} · groups ${settings.sectionGap} · page ${settings.pagePadding}`,
+    ],
+    ["Background", background],
+    [
+      "Inspector",
+      `${importTitle(settings.inspectorMode)} · ${importTitle(settings.inspectorSide)}`,
+    ],
+    ["Item counts", settings.showItemCounts ? "Shown" : "Hidden"],
+    ["Locked", settings.locked ? "Yes" : "No"],
+  ];
+  importSettingsList.replaceChildren();
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "import-setting-row";
+    const labelElement = document.createElement("span");
+    labelElement.textContent = label;
+    const valueElement = document.createElement("span");
+    valueElement.textContent = value;
+    row.append(labelElement, valueElement);
+    importSettingsList.append(row);
+  }
+}
+
+function updateImportReview(): void {
+  if (!importCandidate) {
+    confirmImportButton.disabled = true;
+    return;
+  }
+  const itemsSelected = importCandidate.sections !== undefined && importItemsInput.checked;
+  const settingsSelected = importCandidate.settings !== undefined && importSettingsInput.checked;
+  importItemsPreview.hidden = !itemsSelected;
+  importSettingsPreview.hidden = !settingsSelected;
+  confirmImportButton.disabled = !itemsSelected && !settingsSelected;
+}
+
+function showImportCandidate(candidate: ImportCandidate): void {
+  importCandidate = candidate;
+  importFileName.textContent = candidate.fileName;
+  const parts = [];
+  if (candidate.sections !== undefined) {
+    parts.push(
+      `${countImportSections(candidate.sections)} groups · ${countImportLinks(candidate.sections)} links`,
+    );
+    importItemsCount.textContent = `${countImportSections(candidate.sections)} groups · ${countImportLinks(candidate.sections)} links`;
+    renderImportItemsPreview(candidate.sections);
+  }
+  if (candidate.settings) {
+    parts.push("app settings");
+    importSettingsCount.textContent = "Ready to import";
+    renderImportSettingsPreview(candidate.settings);
+  }
+  importFileSource.textContent = `${candidate.source} · ${parts.join(" · ")}`;
+  importItemsInput.disabled = candidate.sections === undefined;
+  importItemsInput.checked = candidate.sections !== undefined;
+  importSettingsInput.disabled = candidate.settings === undefined;
+  importSettingsInput.checked = candidate.settings !== undefined;
+  importPicker.hidden = true;
+  importReview.hidden = false;
+  importReviewBody.hidden = false;
+  importError.hidden = true;
+  updateImportReview();
+}
+
+function showImportError(fileName: string, error: unknown): void {
+  importCandidate = undefined;
+  importFileName.textContent = fileName || "Selected file";
+  importFileSource.textContent = "Not compatible with Tessera";
+  importErrorMessage.textContent = formatImportError(error);
+  importItemsInput.checked = false;
+  importItemsInput.disabled = true;
+  importSettingsInput.checked = false;
+  importSettingsInput.disabled = true;
+  importPicker.hidden = true;
+  importReview.hidden = false;
+  importReviewBody.hidden = true;
+  importError.hidden = false;
+  confirmImportButton.disabled = true;
+}
+
+function resetImportDialog(): void {
+  importReadToken += 1;
+  importCandidate = undefined;
+  importInput.value = "";
+  importPicker.hidden = false;
+  importReview.hidden = true;
+  importReviewBody.hidden = false;
+  importError.hidden = true;
+  importFileName.textContent = "";
+  importFileSource.textContent = "";
+  importItemsInput.checked = false;
+  importItemsInput.disabled = true;
+  importSettingsInput.checked = false;
+  importSettingsInput.disabled = true;
+  importItemsPreview.hidden = false;
+  importSettingsPreview.hidden = false;
+  importItemsCount.textContent = "";
+  importSettingsCount.textContent = "";
+  importItemsList.replaceChildren();
+  importSettingsList.replaceChildren();
+  confirmImportButton.disabled = true;
+  importDropZone.classList.remove("drag-over");
+}
+
+function openImportDialog(): void {
+  resetImportDialog();
+  if (!importDialog.open) importDialog.showModal();
+  window.requestAnimationFrame(() => importDropZone.focus());
+}
+
+function closeImportDialog(): void {
+  if (importDialog.open) importDialog.close();
+  resetImportDialog();
+}
+
+async function handleImportFile(file: File): Promise<void> {
+  const token = ++importReadToken;
+  importCandidate = undefined;
+  importFileName.textContent = file.name || "Selected file";
+  importFileSource.textContent = "Reading file…";
+  importPicker.hidden = true;
+  importReview.hidden = false;
+  importReviewBody.hidden = true;
+  importError.hidden = true;
+  try {
+    const candidate = await readImportCandidate(file);
+    if (token !== importReadToken) return;
+    showImportCandidate(candidate);
+  } catch (error) {
+    if (token !== importReadToken) return;
+    showImportError(file.name, error);
+  }
+}
+
+async function importCandidateData(
+  candidate: ImportCandidate,
+  selection: TransferSelection,
+): Promise<void> {
+  if (!selection.items && !selection.settings)
+    throw new Error("Choose at least one type of data to import.");
+  if (selection.items && candidate.sections === undefined)
+    throw new Error("This file does not contain groups and links.");
+  if (selection.settings && candidate.settings === undefined)
+    throw new Error("This file does not contain app settings.");
+  const sections = selection.items ? candidate.sections! : data.sections;
+  data = selection.settings ? { ...candidate.settings!, sections } : { ...data, sections };
+  const imported = [];
+  if (selection.items) imported.push(`${countImportSections(sections)} groups`);
+  if (selection.settings) imported.push("app settings");
+  showToast(`Imported ${imported.join(" and ")}.`);
   completeOnboarding();
   selectedId = undefined;
   applyAppearance();
@@ -1822,18 +2237,21 @@ async function importJson(file: File, type: "items" | "settings"): Promise<void>
   await save();
 }
 
-function exportJson(type: "items" | "settings"): void {
+function exportJson(selection: TransferSelection): void {
+  if (!selection.items && !selection.settings)
+    throw new Error("Select at least one thing to export.");
   const { sections, ...settings } = data;
-  const payload =
-    type === "items"
-      ? { type: "tessera-items", version: 1, sections }
-      : { type: "tessera-settings", version: 1, settings };
+  const payload: TesseraExportPayload = { type: "tessera-export", version: 1 };
+  if (selection.items) payload.sections = sections;
+  if (selection.settings) payload.settings = settings;
   const blobUrl = URL.createObjectURL(
     new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
   );
   const link = document.createElement("a");
   link.href = blobUrl;
-  link.download = `tessera-${type}-${new Date().toISOString().slice(0, 10)}.json`;
+  const scope =
+    selection.items && selection.settings ? "backup" : selection.items ? "items" : "settings";
+  link.download = `tessera-${scope}-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
 }
@@ -2038,20 +2456,45 @@ lockButton.addEventListener("click", () => {
   }
   void persistAndRender();
 });
-requireElement<HTMLButtonElement>("#import-items").addEventListener("click", () => {
-  importType = "items";
-  importInput.click();
+importDataButton.addEventListener("click", openImportDialog);
+exportDataButton.addEventListener("click", () => {
+  try {
+    exportJson(getExportSelection());
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Export failed.", true);
+  }
 });
-requireElement<HTMLButtonElement>("#import-settings").addEventListener("click", () => {
-  importType = "settings";
-  importInput.click();
+requireElement<HTMLButtonElement>("#close-import").addEventListener("click", closeImportDialog);
+chooseImportFileButton.addEventListener("click", () => importInput.click());
+chooseImportAnotherButton.addEventListener("click", () => {
+  resetImportDialog();
+  window.requestAnimationFrame(() => importDropZone.focus());
 });
-requireElement<HTMLButtonElement>("#export-items").addEventListener("click", () =>
-  exportJson("items"),
-);
-requireElement<HTMLButtonElement>("#export-settings").addEventListener("click", () =>
-  exportJson("settings"),
-);
+importItemsInput.addEventListener("change", updateImportReview);
+importSettingsInput.addEventListener("change", updateImportReview);
+confirmImportButton.addEventListener("click", async () => {
+  const candidate = importCandidate;
+  if (!candidate) return;
+  const selection = {
+    items: importItemsInput.checked,
+    settings: importSettingsInput.checked,
+  };
+  if (
+    selection.items &&
+    data.sections.length > 0 &&
+    !window.confirm(
+      "Import groups and links? This replaces all groups and links currently in your grid.",
+    )
+  )
+    return;
+  confirmImportButton.disabled = true;
+  try {
+    await importCandidateData(candidate, selection);
+    closeImportDialog();
+  } catch (error) {
+    showImportError(candidate.fileName, error);
+  }
+});
 requireElement<HTMLButtonElement>("#hide-toolbar").addEventListener("click", () => {
   closeMoreMenu();
   toolbar.hidden = true;
@@ -2061,12 +2504,38 @@ importInput.addEventListener("change", async () => {
   const file = importInput.files?.[0];
   importInput.value = "";
   if (!file) return;
-  try {
-    await importJson(file, importType);
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : "Import failed.", true);
-  }
+  await handleImportFile(file);
 });
+importDropZone.addEventListener("click", () => importInput.click());
+importDropZone.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  importInput.click();
+});
+importDropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  importDropZone.classList.add("drag-over");
+});
+importDropZone.addEventListener("dragleave", () => importDropZone.classList.remove("drag-over"));
+importDropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  importDropZone.classList.remove("drag-over");
+  const file = event.dataTransfer?.files[0];
+  if (file) void handleImportFile(file);
+});
+importDialog.addEventListener("paste", (event) => {
+  const file = event.clipboardData?.files[0];
+  const text = event.clipboardData?.getData("text/plain") ?? "";
+  if (!file && !text.trim()) return;
+  event.preventDefault();
+  void handleImportFile(
+    file ?? new File([text], "pasted-workspace.json", { type: "application/json" }),
+  );
+});
+importDialog.addEventListener("click", (event) => {
+  if (event.target === importDialog) closeImportDialog();
+});
+importDialog.addEventListener("close", resetImportDialog);
 moreMenuButton.addEventListener("click", () => {
   if (performance.now() < toolbarActivationBlockedUntil) return;
   const opening = moreMenu.hidden;
