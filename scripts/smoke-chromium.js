@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-import { archives } from "./archive-spec.mjs";
+import { archives } from "./archive-spec.js";
 
 const executableCandidates = [
   process.env.CHROME_PATH,

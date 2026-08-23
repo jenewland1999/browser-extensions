@@ -37,7 +37,7 @@ jobs:
 
       - name: Calculate canary version
         id: version
-        run: node scripts/release-version.mjs canary --ref "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+        run: node scripts/release-version.js canary --ref "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
         env:
           RELEASE_SHA: ${{ github.sha }}
 

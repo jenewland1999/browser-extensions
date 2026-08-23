@@ -36,5 +36,5 @@ shasum -a 256 extensions/npmjs-to-npmx/dist/npmjs-to-npmx.zip
 ```
 
 Archive must match runtime file allowlist in
-`extensions/npmjs-to-npmx/scripts/build.mjs`. Any extra file is a release
+`extensions/npmjs-to-npmx/scripts/build.js`. Any extra file is a release
 blocker until explained and reviewed.

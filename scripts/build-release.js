@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { archives } from "./archive-spec.mjs";
+import { archives } from "./archive-spec.js";
 
 const versionPart = "(?:0|[1-9]\\d*)";
 const releaseTagPattern = new RegExp(
@@ -65,7 +65,7 @@ function main() {
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   }
 
-  execFileSync(process.execPath, ["scripts/normalize-archives.mjs"], { stdio: "inherit" });
+  execFileSync(process.execPath, ["scripts/normalize-archives.js"], { stdio: "inherit" });
 
   const checksumLines = [];
   for (const { extension, archive } of archives) {

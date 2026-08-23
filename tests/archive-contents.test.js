@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 
 import { unzipSync } from "fflate";
 
-import { archives } from "../scripts/archive-spec.mjs";
+import { archives } from "../scripts/archive-spec.js";
 
 for (const { extension, archive, files } of archives) {
   test(`${archive} contains exactly the distributable files`, () => {

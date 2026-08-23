@@ -84,7 +84,7 @@ shasum -a 256 extensions/npmjs-to-npmx/dist/npmjs-to-npmx.zip
 
 Build compiles `src/*.ts` into readable JavaScript, copies static extension
 files into `dist`, and creates archive. Inspect archive against file list in
-`extensions/npmjs-to-npmx/scripts/build.mjs`. Archive is optional for personal
+`extensions/npmjs-to-npmx/scripts/build.js`. Archive is optional for personal
 use because browsers load `dist` directly. Do not add runtime dependencies or
 minified code.
 

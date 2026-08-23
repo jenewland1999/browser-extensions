@@ -250,7 +250,7 @@ function main() {
     return;
   }
 
-  throw new Error("Usage: release-version.mjs canary [--ref <ref>] | stable --candidate <tag>");
+  throw new Error("Usage: release-version.js canary [--ref <ref>] | stable --candidate <tag>");
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

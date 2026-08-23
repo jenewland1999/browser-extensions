@@ -5,14 +5,14 @@
   "description": "Import, export, and clear Chrome Reading List entries.",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build.js",
     "lint": "oxlint src scripts test",
     "test": "pnpm run build && pnpm run test:unit",
     "test:unit": "node --test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/chrome": "0.2.6",
+    "@types/chrome": "0.2.7",
     "typescript": "7.0.2"
   },
   "engines": {

@@ -5,7 +5,7 @@
   "description": "A calm, tile-based Chromium new tab workspace.",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build.js",
     "lint": "oxlint src scripts test",
     "test": "pnpm run build && pnpm run test:unit",
     "test:unit": "node --test",
@@ -14,7 +14,7 @@
   "devDependencies": {
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
-    "@types/chrome": "0.2.6",
+    "@types/chrome": "0.2.7",
     "typescript": "7.0.2",
     "unicode-emoji-json": "0.9.0"
   },
