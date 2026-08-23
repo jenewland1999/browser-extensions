@@ -2053,7 +2053,7 @@ function appendImportTree(nodes: Node[], container: HTMLElement): void {
 function importTitle(value: string): string {
   return value
     .split("-")
-    .map((word) => word[0]?.toUpperCase() + word.slice(1))
+    .map((word) => (word ? word[0]!.toUpperCase() + word.slice(1) : ""))
     .join(" ");
 }
 
@@ -2227,7 +2227,7 @@ async function importCandidateData(
   const sections = selection.items ? candidate.sections! : data.sections;
   data = selection.settings ? { ...candidate.settings!, sections } : { ...data, sections };
   const imported = [];
-  if (selection.items) imported.push(`${sections.length} groups`);
+  if (selection.items) imported.push(`${countImportSections(sections)} groups`);
   if (selection.settings) imported.push("app settings");
   showToast(`Imported ${imported.join(" and ")}.`);
   completeOnboarding();
@@ -2479,6 +2479,14 @@ confirmImportButton.addEventListener("click", async () => {
     items: importItemsInput.checked,
     settings: importSettingsInput.checked,
   };
+  if (
+    selection.items &&
+    data.sections.length > 0 &&
+    !window.confirm(
+      "Import groups and links? This replaces all groups and links currently in your grid.",
+    )
+  )
+    return;
   confirmImportButton.disabled = true;
   try {
     await importCandidateData(candidate, selection);

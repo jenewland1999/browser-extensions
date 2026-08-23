@@ -2077,9 +2077,7 @@ legend {
   color: #c33e3e;
 }
 
-.import-dialog[open] {
-  display: flex;
-  flex-direction: column;
+.import-dialog {
   width: min(640px, calc(100vw - 32px));
   max-height: min(760px, calc(100vh - 32px));
   padding: 0;
@@ -2089,6 +2087,11 @@ legend {
   background: var(--surface-solid);
   box-shadow: var(--shadow);
   color: var(--text);
+}
+
+.import-dialog[open] {
+  display: flex;
+  flex-direction: column;
 }
 
 .import-dialog::backdrop {
@@ -2308,8 +2311,8 @@ legend {
   width: 6px;
   height: 6px;
   margin-left: 10px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
   content: "";
   transform: rotate(45deg) translateY(-2px);
   transition: transform 140ms ease;

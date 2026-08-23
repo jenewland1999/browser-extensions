@@ -306,9 +306,10 @@ test("uses a reviewed import dialog and independent export switches", async () =
   assert.match(html, /id="export-settings" type="checkbox" role="switch" checked/);
   assert.match(html, /id="import-data"/);
   assert.match(html, /id="import-dialog"/);
-  assert.match(html, /id="import-drop-zone"/);
-  assert.match(html, /class="import-drop-zone"/);
-  assert.match(html, /role="button"/);
+  const importDropZone = html.match(/<div\s+[^>]*id="import-drop-zone"[^>]*>/)?.[0] ?? "";
+  assert.match(importDropZone, /class="import-drop-zone"/);
+  assert.match(importDropZone, /role="button"/);
+  assert.match(importDropZone, /tabindex="0"/);
   assert.match(html, /id="import-items" type="checkbox" role="switch"/);
   assert.match(html, /id="import-settings" type="checkbox" role="switch"/);
   assert.match(html, /id="confirm-import" type="button" disabled/);
@@ -352,6 +353,8 @@ test("uses a reviewed import dialog and independent export switches", async () =
   assert.match(script, /import-tree-section/);
   assert.match(script, /import-tree-url/);
   assert.match(script, /importCandidateData/);
+  assert.match(script, /This replaces all groups and links currently in your grid\./);
+  assert.match(script, /countImportSections\(sections\)/);
   assert.match(script, /This JSON is not a Tessera or Structured Start Tab export/);
 });
 
