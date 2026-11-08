@@ -4,7 +4,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # Match pnpm 11's default minimumReleaseAge of 1440 minutes.
+    # Match pnpm's default minimumReleaseAge of 1440 minutes.
     cooldown:
       default-days: 1
     groups:

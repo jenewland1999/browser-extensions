@@ -15,8 +15,8 @@ Turborepo.
 
 ## Requirements
 
-- Node.js 24 or newer
-- pnpm 11.17.0
+- Node.js 26.13.0 or newer within the Node.js 26 LTS line
+- pnpm 12.18.0
 - `zip` for the extension workspace build scripts; root archive normalization
   and validation do not require `unzip`
 - Chrome for Testing or Chromium for the unpacked-extension smoke test
